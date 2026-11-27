@@ -91,7 +91,7 @@ No web server, Python, or Node.js runtime required!
 
 Developed by **Yiğit Alp Sarı**
 - **GitHub Profile**: [@yigitalpsari](https://github.com/yigitalpsari)
-- **Repository**: [https://github.com/yigitalpsari/admiralty-corrections-hub](https://github.com/yigitalpsari)
+- **Repository**: [https://github.com/yigitalpsari/admiralty-corrections](https://github.com/yigitalpsari)
 
 ---
 
