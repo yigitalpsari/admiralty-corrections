@@ -1268,78 +1268,167 @@
       }
     }
 
-    // Intelligent Multi-Section Matching Algorithm
-    function matchPublicationInText(pub, pageText, currentSection) {
-      if (!pageText) return false;
-      const code = pub.code.toUpperCase().trim();
+    // Marine Engineering Engine: Section Mapping, Normalization & Continuation
+    const VOL_TO_NP_MAP = {
+      'A': 'NP74', 'B': 'NP75', 'C': 'NP76', 'D': 'NP77', 'E': 'NP78',
+      'F': 'NP79', 'G': 'NP80', 'H': 'NP81', 'J': 'NP82', 'K': 'NP83',
+      'L': 'NP84', 'M': 'NP85', 'N': 'NP86', 'P': 'NP87', 'Q': 'NP88'
+    };
+    const NP_TO_VOL_MAP = {};
+    for (const [v, np] of Object.entries(VOL_TO_NP_MAP)) {
+      NP_TO_VOL_MAP[np] = `VOL_${v}`;
+    }
+
+    function getPublicationTargetSection(pub) {
+      const code = (pub.code || '').toUpperCase().trim();
       const title = (pub.title || '').toUpperCase().trim();
 
-      // Section IV: Sailing Directions (Pilots)
-      if (currentSection === "SEC_IV") {
-        const npMatch = code.match(/NP\s*(\d+)/i);
-        if (npMatch) {
-          const npNum = npMatch[1];
-          const pattern1 = new RegExp(`\\bNP\\s*0*${npNum}\\b`, 'i');
-          if (pattern1.test(pageText)) return true;
-        }
-        if (title) {
-          const cleanTitle = title.replace(/\s*VOL(?:UME)?\s*\d+/i, '').trim();
-          if (cleanTitle.length > 5 && pageText.toUpperCase().includes(cleanTitle)) {
-            return true;
+      // Section VI: ALRS Radio Signals (NP281 through NP288)
+      if (/^NP\s*28[1-8]/i.test(code) || /RADIO\s+SIGNALS|ALRS/i.test(title)) {
+        return "SEC_VI";
+      }
+
+      // Section V: List of Lights (NP74 to NP88, or Volume A-Q)
+      if (/^NP\s*(?:7[4-9]|8[0-8])\b/i.test(code) || /^VOL(?:UME)?\.?\s*[A-Q]\b/i.test(code) || /LIST\s+OF\s+LIGHTS/i.test(title)) {
+        return "SEC_V";
+      }
+
+      // Section IV: Sailing Directions (Pilots), Mariner's Handbook (NP100), Buoyage (NP735), Ocean Passages (NP136), Catalogues, etc.
+      return "SEC_IV";
+    }
+
+    function normalizePubCode(raw) {
+      if (!raw) return "";
+      let c = raw.toUpperCase().trim();
+      c = c.replace(/^NP\s+/i, 'NP');
+      c = c.replace(/\s*\(\s*(\d+)\s*\)/g, '($1)');
+      const vm = c.match(/^(?:VOLUME|VOL\.?)\s*([A-Q])/i);
+      if (vm) return `VOL_${vm[1]}`;
+      return c;
+    }
+
+    function doesPubMatchDetectedCode(pub, detectedCode) {
+      const userNorm = normalizePubCode(pub.code);
+      const detNorm = normalizePubCode(detectedCode);
+
+      if (userNorm === detNorm) return true;
+
+      // Handle Section V mapping (NP76 <-> VOL_C)
+      if (NP_TO_VOL_MAP[userNorm] && NP_TO_VOL_MAP[userNorm] === detNorm) return true;
+      if (detNorm.startsWith('VOL_') && VOL_TO_NP_MAP[detNorm.slice(4)] === userNorm) return true;
+
+      // Handle Radio Signals parts:
+      const userMatch = userNorm.match(/^(NP\d+)(?:\((\d+)\))?$/);
+      const detMatch = detNorm.match(/^(NP\d+)(?:\((\d+)\))?$/);
+      if (userMatch && detMatch) {
+        if (userMatch[1] === detMatch[1]) {
+          if (userMatch[2] && detMatch[2]) {
+            return userMatch[2] === detMatch[2];
           }
+          if (!userMatch[2]) return true; // User entered base series (e.g. NP286 without part)
         }
-        return false;
       }
 
-      // Section V: List of Lights & Fog Signals
-      if (currentSection === "SEC_V") {
-        const volMatch = code.match(/VOL(?:UME)?\.?\s*([A-Q])/i) || title.match(/VOL(?:UME)?\.?\s*([A-Q])/i);
-        if (volMatch) {
-          const letter = volMatch[1];
-          const letPatt = new RegExp(`\\b(?:Volume|Vol\\.?)\\s*${letter}\\b`, 'i');
-          if (letPatt.test(pageText)) return true;
+      // Title matching fallback for Pilots in Section IV
+      if (pub.title && detNorm.startsWith('NP')) {
+        const cleanTitle = pub.title.toUpperCase().replace(/\s*VOL(?:UME)?\s*\d+/i, '').trim();
+        if (cleanTitle.length > 5 && detectedCode.toUpperCase().includes(cleanTitle)) {
+          return true;
         }
-        const npMatch = code.match(/NP\s*(7[4-9]|8[0-8])\b/i) || title.match(/NP\s*(7[4-9]|8[0-8])\b/i);
-        if (npMatch) {
-          const npPatt = new RegExp(`\\bNP\\s*0*${npMatch[1]}\\b`, 'i');
-          if (npPatt.test(pageText)) return true;
-        }
-        return false;
-      }
-
-      // Section VI: List of Radio Signals (ALRS)
-      if (currentSection === "SEC_VI") {
-        const subMatch = code.match(/NP\s*(28\d)\s*(?:\(\s*(\d+)\s*\))?/i);
-        if (subMatch) {
-          const baseNum = subMatch[1];
-          const partNum = subMatch[2];
-          if (partNum) {
-            const rxPart = new RegExp(`NP\\s*0*${baseNum}\\s*\\(\\s*0*${partNum}\\s*\\)`, 'i');
-            const rxVolPart = new RegExp(`\\b(?:Volume|Vol\\.?)\\s*0*${baseNum.slice(-1)}\\s*,?\\s*(?:Part|Pt\\.?)\\s*0*${partNum}\\b`, 'i');
-            if (rxPart.test(pageText) || rxVolPart.test(pageText)) return true;
-          } else {
-            const rxBase = new RegExp(`\\bNP\\s*0*${baseNum}\\b`, 'i');
-            if (rxBase.test(pageText)) return true;
-          }
-        }
-
-        const cleanCode = code.replace(/\s+/g, '');
-        const escCode = cleanCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const pattern = new RegExp(escCode, 'i');
-        const noSpaceText = pageText.replace(/\s+/g, '');
-        if (pattern.test(noSpaceText)) return true;
-
-        return false;
-      }
-
-      // General fallback matching if section is unclassified
-      const npGeneral = code.match(/NP\s*(\d+)/i);
-      if (npGeneral) {
-        const pattern = new RegExp(`\\bNP\\s*0*${npGeneral[1]}\\b`, 'i');
-        if (pattern.test(pageText)) return true;
       }
 
       return false;
+    }
+
+    function detectSec6HeadingsOnPage(pageText) {
+      // Exclude Section VI pure Explanatory Notes / Preface pages without actual amendments
+      if (/ONGOING\s+MAINTENANCE\s+PROCESS/i.test(pageText) && !/\bPAGE\s+\d+/i.test(pageText)) return [];
+      if (/RECORD\s+OF\s+AMENDMENTS/i.test(pageText) && /The\s+following\s+amendments\s+are\s+to\s+be\s+applied/i.test(pageText) && !/\bPAGE\s+\d+/i.test(pageText)) return [];
+
+      const found = [];
+
+      // 1. Check NP28X headings (using (?!\w) so punctuation like comma after parenthesis e.g. NP283(1), matches)
+      const npRegex = /\bNP\s*0*(28\d)(?:\s*\(\s*0*([1-8])\s*\))?(?!\w)/gi;
+      let match;
+      while ((match = npRegex.exec(pageText)) !== null) {
+        const base = match[1];
+        const part = match[2];
+        const matchIdx = match.index;
+        const textBefore = pageText.substring(Math.max(0, matchIdx - 60), matchIdx);
+
+        // Skip citations / examples like "(for example: NP286(3)...)", "see ALRS Volume 6(4) (NP286(4)...)", "e.g."
+        if (/for\s+example/i.test(textBefore) || /e\.g\./i.test(textBefore) || /\bsee\b/i.test(textBefore) || /\bconsult\b/i.test(textBefore)) {
+          continue;
+        }
+
+        if (part) {
+          found.push(`NP${base}(${part})`);
+        } else {
+          if (['284', '285', '287', '288'].includes(base)) {
+            found.push(`NP${base}`);
+          } else {
+            const textAfter = pageText.substring(matchIdx, Math.min(pageText.length, matchIdx + 80));
+            const partNear = textAfter.match(/(?:Part|Pt\.?)\s*([1-8])/i);
+            if (partNear) {
+              found.push(`NP${base}(${partNear[1]})`);
+            } else {
+              found.push(`NP${base}`);
+            }
+          }
+        }
+      }
+
+      // 2. Check "VOLUME X, PART Y" or "VOLUME 5" banners
+      const volRegex = /\bVOLUME\s*([1-8])\b(?:\s*,?\s*(?:PART|Pt\.?)\s*([1-8]))?/gi;
+      while ((match = volRegex.exec(pageText)) !== null) {
+        const volNum = match[1];
+        const partNum = match[2];
+        const base = '28' + volNum;
+        if (partNum) {
+          found.push(`NP${base}(${partNum})`);
+        } else if (['4', '5', '7', '8'].includes(volNum)) {
+          found.push(`NP${base}`);
+        }
+      }
+
+      return Array.from(new Set(found));
+    }
+
+    function detectSec4HeadingsOnPage(pageText) {
+      if (/The\s+following\s+amendments\s+to\s+Admiralty\s+Sailing\s+Directions\s+are\s+published/i.test(pageText) && !/\bPage\s+\d+/i.test(pageText)) {
+        return [];
+      }
+
+      const found = [];
+      const regexPilots = /\bNP\s*(\d+(?:-\d+)?)\b[^\n\r]{0,80}?(?:Pilot|Handbook|Directions|Passages|Buoyage|Catalogue|Edition|\(\s*\d+(?:st|nd|rd|th)\s+Edition)/gi;
+      let match;
+      while ((match = regexPilots.exec(pageText)) !== null) {
+        const rawNum = match[1].replace(/\s+/g, '');
+        const matchIdx = match.index;
+        const textBefore = pageText.substring(Math.max(0, matchIdx - 60), matchIdx);
+        if (/for\s+example/i.test(textBefore) || /e\.g\./i.test(textBefore) || /\bsee\b/i.test(textBefore) || /\bconsult\b/i.test(textBefore)) continue;
+        found.push(`NP${rawNum}`);
+      }
+
+      const pilotHeadings = pageText.matchAll(/\b([A-Z][a-zA-Z\s]{4,35}Pilot(?:\s+Vol(?:ume)?\s*\d+)?)\s*\(\s*\d+(?:st|nd|rd|th)\s+Edition/gi);
+      for (const ph of pilotHeadings) {
+        found.push(ph[1].trim());
+      }
+
+      return Array.from(new Set(found));
+    }
+
+    function detectSec5HeadingsOnPage(pageText) {
+      const found = [];
+      const volMatches = pageText.matchAll(/\b(?:VOLUME|Vol\.?)\s*([A-Q])\b/gi);
+      for (const vm of volMatches) {
+        found.push(`VOL_${vm[1].toUpperCase()}`);
+      }
+      const npMatches = pageText.matchAll(/\bNP\s*(7[4-9]|8[0-8])\b/gi);
+      for (const nm of npMatches) {
+        found.push(`NP${nm[1]}`);
+      }
+      return Array.from(new Set(found));
     }
 
     function matchSlipToPublication(pub, slipName) {
@@ -1406,6 +1495,9 @@
         });
 
         let currentSection = "UNKNOWN";
+        let activeSec4Pub = null;
+        let activeSec5Pub = null;
+        let activeSec6Pub = null;
 
         for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
           const percent = Math.round((pageNum / totalPages) * 100);
@@ -1416,31 +1508,108 @@
           const textContent = await page.getTextContent();
           const pageText = textContent.items.map(item => item.str).join(' ');
 
-          if (/\bSECTION\s+VI\b/i.test(pageText) || /AMENDMENTS\s+TO\s+ADMIRALTY\s+LIST\s+OF\s+RADIO\s+SIGNALS/i.test(pageText) || /UPDATES\s+TO\s+ADMIRALTY\s+LIST\s+OF\s+RADIO\s+SIGNALS/i.test(pageText)) {
-            currentSection = "SEC_VI";
-          } else if (/\bSECTION\s+V\b/i.test(pageText) || /AMENDMENTS\s+TO\s+ADMIRALTY\s+LISTS?\s+OF\s+LIGHTS/i.test(pageText) || /UPDATES\s+TO\s+ADMIRALTY\s+LISTS?\s+OF\s+LIGHTS/i.test(pageText)) {
-            currentSection = "SEC_V";
-          } else if (/\bSECTION\s+IV\b/i.test(pageText) || /AMENDMENTS\s+TO\s+ADMIRALTY\s+SAILING\s+DIRECTIONS/i.test(pageText) || /UPDATES\s+TO\s+ADMIRALTY\s+SAILING\s+DIRECTIONS/i.test(pageText)) {
-            currentSection = "SEC_IV";
-          } else if (/\bSECTION\s+(?:I|II|III|VII|VIII)\b/i.test(pageText) || /INDEX\s+OF\s+CHARTS/i.test(pageText) || /RECORD\s+OF\s+NOTICES\s+TO\s+MARINERS/i.test(pageText)) {
+          // 1. Explicit Non-Amendment & Form pages (e.g. Hydrographic Note Form H.102 at end of bulletin)
+          if (
+            /HYDROGRAPHIC\s+NOTE\s+FOR\s+MARINERS/i.test(pageText) ||
+            /HYDROGRAPHIC\s+NOTE\s*[\±\+\-]/i.test(pageText) ||
+            /FORM\s+H\.?102/i.test(pageText) ||
+            /INDEX\s+OF\s+CHARTS/i.test(pageText) ||
+            /RECORD\s+OF\s+NOTICES\s+TO\s+MARINERS/i.test(pageText) ||
+            /\bSECTION\s+(?:I|II|III|VII|VIII)\b/i.test(pageText)
+          ) {
             currentSection = "OTHER_SECTION";
+            activeSec4Pub = null;
+            activeSec5Pub = null;
+            activeSec6Pub = null;
+            continue;
           }
 
-          let sectionAllowed = false;
-          if (currentSection === "SEC_IV" && optSec4) sectionAllowed = true;
-          if (currentSection === "SEC_V" && optSec5) sectionAllowed = true;
-          if (currentSection === "SEC_VI" && optSec6) sectionAllowed = true;
+          // 2. Identify Section Headers
+          if (/\bSECTION\s+VI\b/i.test(pageText) || /AMENDMENTS\s+TO\s+ADMIRALTY\s+LIST\s+OF\s+RADIO\s+SIGNALS/i.test(pageText) || /UPDATES\s+TO\s+ADMIRALTY\s+LIST\s+OF\s+RADIO\s+SIGNALS/i.test(pageText)) {
+            currentSection = "SEC_VI";
+            activeSec4Pub = null;
+            activeSec5Pub = null;
+          } else if (/\bSECTION\s+V\b/i.test(pageText) || /AMENDMENTS\s+TO\s+ADMIRALTY\s+LISTS?\s+OF\s+LIGHTS/i.test(pageText) || /UPDATES\s+TO\s+ADMIRALTY\s+LISTS?\s+OF\s+LIGHTS/i.test(pageText)) {
+            currentSection = "SEC_V";
+            activeSec4Pub = null;
+            activeSec6Pub = null;
+          } else if (/\bSECTION\s+IV\b/i.test(pageText) || /AMENDMENTS\s+TO\s+ADMIRALTY\s+SAILING\s+DIRECTIONS/i.test(pageText) || /UPDATES\s+TO\s+ADMIRALTY\s+SAILING\s+DIRECTIONS/i.test(pageText)) {
+            currentSection = "SEC_IV";
+            activeSec5Pub = null;
+            activeSec6Pub = null;
+          }
 
-          if (sectionAllowed) {
+          // Safety check against internal page numbers in margins (6.x = Sec VI, 5.x = Sec V, 4.x = Sec IV)
+          if (currentSection === "SEC_VI" && /\b[45]\.\d+\b/.test(pageText) && !/\b6\.\d+\b/.test(pageText)) {
+            if (/\b4\.\d+\b/.test(pageText)) currentSection = "SEC_IV";
+            if (/\b5\.\d+\b/.test(pageText)) currentSection = "SEC_V";
+          }
+
+          // Helper to register page for matching publications with strict target section verification
+          function registerMatch(detectedCode, isContinuation = false) {
             for (const pub of activePubs) {
-              if (matchPublicationInText(pub, pageText, currentSection)) {
+              const targetSec = getPublicationTargetSection(pub);
+              if (targetSec !== currentSection) continue; // STRICT SECTION DOMAIN ISOLATION!
+
+              if (doesPubMatchDetectedCode(pub, detectedCode)) {
                 pubResults[pub.code].found = true;
                 if (!pubResults[pub.code].pages.includes(pageNum)) {
                   pubResults[pub.code].pages.push(pageNum);
                 }
                 pagesToInclude.add(pageNum);
-                log(`-> Page ${pageNum} [${currentSection}]: Amendment found for ${pub.code}.`);
+                const contTag = isContinuation ? " (Continuation)" : "";
+                log(`-> Page ${pageNum} [${currentSection}]: Amendment found for ${pub.code}${contTag}.`);
               }
+            }
+          }
+
+          // === SECTION VI: Radio Signals (ALRS) ===
+          if (currentSection === "SEC_VI" && optSec6) {
+            if (/ONGOING\s+MAINTENANCE\s+PROCESS/i.test(pageText) && !/\bPAGE\s+\d+/i.test(pageText)) {
+              activeSec6Pub = null;
+              continue;
+            }
+
+            const headings = detectSec6HeadingsOnPage(pageText);
+
+            if (activeSec6Pub) {
+              registerMatch(activeSec6Pub, true);
+            }
+            if (headings.length > 0) {
+              for (const h of headings) {
+                registerMatch(h, false);
+              }
+              activeSec6Pub = headings[headings.length - 1];
+            }
+          }
+
+          // === SECTION IV: Sailing Directions (Pilots & Handbook) ===
+          if (currentSection === "SEC_IV" && optSec4) {
+            const headings = detectSec4HeadingsOnPage(pageText);
+
+            if (activeSec4Pub) {
+              registerMatch(activeSec4Pub, true);
+            }
+            if (headings.length > 0) {
+              for (const h of headings) {
+                registerMatch(h, false);
+              }
+              activeSec4Pub = headings[headings.length - 1];
+            }
+          }
+
+          // === SECTION V: List of Lights ===
+          if (currentSection === "SEC_V" && optSec5) {
+            const headings = detectSec5HeadingsOnPage(pageText);
+
+            if (activeSec5Pub) {
+              registerMatch(activeSec5Pub, true);
+            }
+            if (headings.length > 0) {
+              for (const h of headings) {
+                registerMatch(h, false);
+              }
+              activeSec5Pub = headings[headings.length - 1];
             }
           }
         }
