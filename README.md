@@ -7,11 +7,7 @@
 [![Platform: Web](https://img.shields.io/badge/Platform-All_Browsers-lightgrey.svg)]()
 [![SOLAS V Compliance](https://img.shields.io/badge/SOLAS-Chapter%20V%20Reg%2027-success.svg)]()
 
-> **[🇹🇷 Türkçe Açıklama](#-türkçe-açıklama)** | **[🇬🇧 English Description](#-english-description)**
-
 ---
-
-## 🇬🇧 English Description
 
 ### 🌟 Overview
 **Admiralty Notices to Mariners (WKNMs) Tools** is a standalone, client-side maritime web application suite developed specifically for Navigating Officers (2nd Mates) and Master Mariners. It automates the extraction and collation of relevant correction pages, chart tracings, and publication paste-in slips directly from United Kingdom Hydrographic Office (UKHO) **Weekly Notices to Mariners (WKNMs)** bulletins and **Publications Weekly (PWKLY)** releases.
@@ -88,68 +84,6 @@ No web server, Python, or Node.js runtime required!
 2. Double-click **`CHART_CORRECTIONS.html`** or **`PUBLICATIONS_CORRECTIONS.html`** in any modern web browser (Google Chrome, Microsoft Edge, Brave, Firefox).
 3. If the `lib` folder is missing, run **`download-libraries.bat`** once to download the offline dependencies.
 4. Input your vessel's chart numbers or publications, drop the weekly ZIP or PDF release, and click **Scan & Generate Corrections PDF**!
-
----
-
-<br/>
-
-## 🇹🇷 Türkçe Açıklama
-
-### 🌟 Genel Bakış
-**Admiralty Notices to Mariners (WKNMs) Tools**, gemi 2. Kaptanları (Navigasyon Zabiti) ve Süvariler için özel olarak geliştirilmiş, tamamen tarayıcı üzerinde ve çevrimdışı (offline) çalışan bir seyir düzeltme ve ayıklama sistemidir.
-
-Birleşik Krallık Hidrografi Dairesi'nin (UKHO) haftalık yayımladığı **Weekly Notices to Mariners (WKNMs)** bültenleri ve **Publications Weekly (PWKLY)** dosyaları içerisinden, yalnızca gemide mevcut olan harita ve kitapların düzeltmelerini, çizimlerini (tracings) ve yapıştırma slip sayfalarını otomatik olarak ayıklar.
-
-Yüzlerce sayfalık bültenlerin arasında saatlerce manuel harita arama zahmetini ortadan kaldırır, gemideki yazıcı kağıdı ve kartuş tüketiminde **%80–%90 tasarruf** sağlar ve Port State (PSC) ile vetting denetimleri için resmi standartta **Köprüüstü Kontrol & İmza Sayfası** üretir.
-
-**Yerel `lib/` klasörü sayesinde internet bağlantısına ihtiyaç duymaz; açık denizde %100 çevrimdışı çalışır.**
-
----
-
-### ✨ Öne Çıkan Özellikler
-
-- 🗺️ **Otomatik Kağıt Harita Düzeltme Ayıklayıcı (`CHART_CORRECTIONS.html`):**
-  - Yalnızca gemi envanterinizde işaretli haritalara ait Section II sayfalarını yeni bir PDF'e toplar.
-  - ZIP veya klasör içindeki harita çizimlerini (tracings, örn: `Chart1057NM1234.pdf`) otomatik tespit edip PDF sonuna ekler.
-  - Kapak sayfası, Publication List ve `INDEX OF CHARTS AFFECTED` fihrist sayfalarını isteğe bağlı olarak korur.
-
-- 🛡️ **Çift Katmanlı Yanlış Pozitif Koruması:**
-  - Eski düzeltme numaralarını (örn: `Chart 830 [ previous update 3930/26 ]`) harita başlığı sanarak yanlış sayfa çeken hatalı algoritmaları engeller.
-  - Resmi `INDEX OF CHARTS AFFECTED` fihristiyle çapraz doğrulama yaparak sahte eşleşmeleri sıfıra indirir.
-
-- 📚 **Kitap ve Seyir Yayını Düzeltmeleri (`PUBLICATIONS_CORRECTIONS.html`):**
-  - **Section IV**: Seyir Rehberleri (Sailing Directions / Pilots).
-  - **Section V**: Fenerler ve Sis İşaretleri (List of Lights & Fog Signals - Volume A'dan Q'ya).
-  - **Section VI**: Radyo Sinyalleri Listesi (ALRS Volume 1'den 6'ya).
-  - Haftalık bültenlerde yer alan yapıştırma slip ve blok diyagramları (`NP...pdf`) otomatik ekler.
-
-- 📋 **Yazıcı Tasarruflu Köprüüstü İmza ve Kayıt Sayfası:**
-  - Oluşturulan her PDF'in sonuna siyah-beyaz, mürekkep tasarruflu resmi kontrol sayfası eklenir.
-  - Harita/kitap numarası, ilgili Notice numarası, bülten sayfası, `[ ]` kontrol kutucuğu, NIL (düzeltmesi olmayanlar) listesi ve zabit imza bloğu yer alır.
-
-- 🌓 **İki Ayrı Tema (Gündüz ve Gece Modu):**
-  - **Gece Modu:** Köprüüstü gece vardiyalarında gözü almayan yüksek kontrastlı koyu tema.
-  - **Gündüz Modu:** Klasik Windows ve Navigator Light tonları.
-  - Temaya göre otomatik renk değiştiren özel kaydırma çubuğu (scrollbar).
-
-- 💾 **Kalıcı Tarayıcı Hafızası ve Yedekleme:**
-  - Girilen harita ve kitaplar tarayıcı hafızasında saklanır.
-  - `.json` formatında dışa aktarma (yedek alma) veya `.txt`, `.csv` formatında toplu içe aktarma imkanı sunar.
-  - Sayfalar açıldığında temiz bir sayfa (0 harita / 0 yayın) ile başlar.
-
----
-
-### 💻 Kurulum ve Çalıştırma
-
-Herhangi bir kurulum veya sunucu gerekmez!
-
-1. Depoyu bilgisayarınıza indirin:
-   ```bash
-   git clone https://github.com/yigitalpsari/admiralty-corrections-hub.git
-   ```
-2. **`CHART_CORRECTIONS.html`** veya **`PUBLICATIONS_CORRECTIONS.html`** dosyasını Google Chrome veya Microsoft Edge ile açın.
-3. Çevrimdışı kütüphaneleri kontrol etmek veya eksikse indirmek için **`download-libraries.bat`** dosyasını çalıştırmanız yeterlidir.
-4. Harita veya kitaplarınızı ekleyin, haftalık ZIP veya PDF dosyasını sürükleyip bırakın ve PDF'inizi saniyeler içinde oluşturun!
 
 ---
 
