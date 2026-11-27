@@ -87,11 +87,8 @@ No web server, Python, or Node.js runtime required!
 
 ---
 
-### 👨‍✈️ Author & Contact
-
-Developed by **Yiğit Alp Sarı**
-- **GitHub Profile**: [@yigitalpsari](https://github.com/yigitalpsari)
-- **Repository**: [https://github.com/yigitalpsari/admiralty-corrections](https://github.com/yigitalpsari)
+### 👨‍💻 Developer
+- **Yiğit Alp Sarı** - [GitHub Profile](https://github.com/yigitalpsari)
 
 ---
 
