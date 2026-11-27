@@ -323,6 +323,25 @@
       border-radius: 4px;
       background: var(--input-bg);
       padding: 6px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--card-border) var(--input-bg);
+    }
+
+    /* THEME-ADAPTIVE SCROLLBAR */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--input-bg);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--card-border);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent);
     }
 
     .pub-item {
