@@ -767,6 +767,10 @@
           <input type="checkbox" id="optTracings" checked>
           <span>Append Chart Tracings to PDF (if available)</span>
         </label>
+        <label class="option-item">
+          <input type="checkbox" id="optHighlight" checked>
+          <span>🖍️ Highlight Detected Numbers in PDF (Yellow Marker)</span>
+        </label>
       </div>
 
       <!-- Progress Bar -->
@@ -1267,6 +1271,21 @@
       return hasValidHeading;
     }
 
+    function deduplicateRects(rectList) {
+      const unique = [];
+      for (const r of rectList) {
+        const exists = unique.some(u => 
+          Math.abs(u.x - r.x) < 4 && 
+          Math.abs(u.y - r.y) < 4 && 
+          Math.abs(u.width - r.width) < 6
+        );
+        if (!exists) {
+          unique.push(r);
+        }
+      }
+      return unique;
+    }
+
     // Extraction & Assembly Engine
     async function startExtraction() {
       if (!loadedFiles.mainPdfBuffer) {
@@ -1286,6 +1305,7 @@
       const optNotices = document.getElementById('optNotices').checked;
       const optSummaryPage = document.getElementById('optSummaryPage').checked;
       const optTracings = document.getElementById('optTracings').checked;
+      const optHighlight = document.getElementById('optHighlight') ? document.getElementById('optHighlight').checked : true;
 
       const btnRun = document.getElementById('btnRun');
       btnRun.disabled = true;
@@ -1308,6 +1328,7 @@
         const pagesToInclude = new Set();
         const chartResults = {};
         const indexPageFullTexts = [];
+        const pageTextContentMap = {};
         activeCharts.forEach(c => {
           chartResults[c.number] = { found: false, pages: [], pdfPages: [], notices: [], hasTracing: false };
         });
@@ -1319,6 +1340,7 @@
 
           const page = await pdfDoc.getPage(pageNum);
           const textContent = await page.getTextContent();
+          pageTextContentMap[pageNum] = textContent.items;
           const pageText = textContent.items.map(item => item.str).join(' ');
 
           if (pageNum === 1) {
@@ -1465,9 +1487,109 @@
         const sortedPageNums = Array.from(pagesToInclude).sort((a, b) => a - b);
         log(`Transferring ${sortedPageNums.length} extracted pages into output PDF...`);
 
+        // Compute yellow highlighter coordinates for detected chart numbers and notice headers
+        const pageHighlights = {};
+        if (optHighlight) {
+          for (const pageNum of sortedPageNums) {
+            const items = pageTextContentMap[pageNum] || [];
+            const rects = [];
+            const pageFullText = items.map(x => x.str).join(' ');
+            const isIdxPage = /INDEX\s+OF\s+CHARTS\s+AFFECTED/i.test(pageFullText);
+
+            for (const chart of activeCharts) {
+              const num = chart.number.trim();
+              const escNum = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const res = chartResults[num];
+              if (!res || !res.found) continue;
+
+              // On notice pages, only highlight if this chart is on this specific page
+              if (!isIdxPage && !res.pdfPages.includes(pageNum)) continue;
+
+              const noticeNums = (res.notices || []).map(n => n.replace(/^NM\s*/i, '').trim());
+
+              for (const item of items) {
+                if (!item.str || !item.transform) continue;
+                const s = item.str.trim();
+                if (!s) continue;
+
+                let matched = false;
+                let matchWidth = item.width || 40;
+
+                // 1. Chart number match on Index page or standalone item
+                if (isIdxPage && (s === num || new RegExp(`^0*${escNum}$`).test(s))) {
+                  matched = true;
+                  matchWidth = Math.max(item.width, 16);
+                }
+                // 2. "Chart XXXX" in notice header
+                else if (new RegExp(`^Charts?\\s+(?:(?:[A-Za-z]{1,5}|INT)\\s+)?0*${escNum}\\b`, 'i').test(s)) {
+                  matched = true;
+                  const m = s.match(new RegExp(`^Charts?\\s+(?:(?:[A-Za-z]{1,5}|INT)\\s+)?0*${escNum}\\b`, 'i'));
+                  const ratio = m[0].length / s.length;
+                  matchWidth = Math.min(item.width, Math.max(item.width * ratio + 4, 35));
+                }
+                // 3. Standalone "Chart XXXX" in text
+                else if (new RegExp(`\\bCharts?\\s+0*${escNum}\\b`, 'i').test(s)) {
+                  matched = true;
+                  matchWidth = item.width;
+                }
+
+                // 4. Notice header number on notice page (e.g. 4283, 4277)
+                if (!matched && !isIdxPage && noticeNums.length > 0) {
+                  for (const nNum of noticeNums) {
+                    if (s === nNum || s === `NM ${nNum}` || s === `${nNum}*` || (s.length < 12 && new RegExp(`^${nNum}\\*?\\b`).test(s))) {
+                      matched = true;
+                      matchWidth = Math.max(item.width, 18);
+                      break;
+                    }
+                  }
+                }
+
+                if (matched) {
+                  const tx = item.transform[4];
+                  const ty = item.transform[5];
+                  const fontSize = Math.abs(item.transform[0]) || Math.abs(item.transform[3]) || item.height || 9;
+                  rects.push({
+                    x: tx - 2,
+                    y: ty - fontSize * 0.22,
+                    width: matchWidth + 4,
+                    height: fontSize * 1.25
+                  });
+                }
+              }
+            }
+            pageHighlights[pageNum] = deduplicateRects(rects);
+          }
+        }
+
         const pageIndices = sortedPageNums.map(n => n - 1);
         const copiedPages = await outDoc.copyPages(srcDoc, pageIndices);
-        copiedPages.forEach(p => outDoc.addPage(p));
+
+        for (let i = 0; i < copiedPages.length; i++) {
+          const p = copiedPages[i];
+          const origPageNum = sortedPageNums[i];
+
+          if (optHighlight && pageHighlights[origPageNum]) {
+            for (const rect of pageHighlights[origPageNum]) {
+              try {
+                p.drawRectangle({
+                  x: rect.x,
+                  y: rect.y,
+                  width: rect.width,
+                  height: rect.height,
+                  color: PDFLib.rgb(1.0, 0.95, 0.0), // Fluorescent yellow highlighter
+                  opacity: 0.38
+                });
+              } catch (drawErr) {
+                console.warn("Could not draw highlight on page " + origPageNum, drawErr);
+              }
+            }
+          }
+          outDoc.addPage(p);
+        }
+
+        if (optHighlight) {
+          log("🖍️ Yellow highlighter markers applied to matching chart numbers and notices in PDF.");
+        }
 
         let attachedTracingsCount = 0;
         if (optTracings) {
