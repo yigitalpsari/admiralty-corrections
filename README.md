@@ -79,7 +79,7 @@ No web server, Python, or Node.js runtime required!
 
 1. Clone or download this repository:
    ```bash
-   git clone https://github.com/yigitalpsari/admiralty-corrections-hub.git
+   git clone https://github.com/yigitalpsari/admiralty-corrections.git
    ```
 2. Double-click **`CHART_CORRECTIONS.html`** or **`PUBLICATIONS_CORRECTIONS.html`** in any modern web browser (Google Chrome, Microsoft Edge, Brave, Firefox).
 3. If the `lib` folder is missing, run **`download-libraries.bat`** once to download the offline dependencies.
@@ -87,11 +87,8 @@ No web server, Python, or Node.js runtime required!
 
 ---
 
-### 👨‍✈️ Author & Contact
-
-Developed by **Yiğit Alp Sarı**
-- **GitHub Profile**: [@yigitalpsari](https://github.com/yigitalpsari)
-- **Repository**: [https://github.com/yigitalpsari/admiralty-corrections-hub](https://github.com/yigitalpsari)
+### 👨‍💻 Developer
+- **Yiğit Alp Sarı** - [GitHub Profile](https://github.com/yigitalpsari)
 
 ---
 
