@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admiralty Notices to Mariners (NMs) - Chart Corrections Extractor</title>
+  
+  <!-- Local Libraries with CDN fallback -->
+  <script src="./lib/jszip.min.js"></script>
+  <script>
+    if (typeof JSZip === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"><\/script>');
+    }
+  </script>
+  
+  <script src="./lib/pdf.min.js"></script>
+  <script>
+    if (typeof pdfjsLib === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>');
+    }
+  </script>
+  
+  <script src="./lib/pdf-lib.min.js"></script>
+  <script>
+    if (typeof PDFLib === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"><\/script>');
+    }
+  </script>
+
+  <style>
+    /* GÜNDÜZ MODU (Navigator Light Windows Klasik) */
+    [data-theme="day"] {
+      --bg-color: #d4d0c8;
+      --card-bg: #ece9d8;
+      --card-border: #808080;
+      --text-main: #000000;
+      --text-muted: #333333;
+      --text-label: #000080;
+      --accent: #003399;
+      --accent-hover: #002266;
+      --success: #007a3d;
+      --danger: #aa0000;
+      --input-bg: #ffffff;
+      --input-border: #7f9db9;
+      --input-text: #000000;
+      --table-header: #dcd8ce;
+      --table-header-text: #000000;
+      --table-row-even: #f7f6f2;
+      --table-row-odd: #ffffff;
+      --book-line: #888888;
+      --highlight: #cce8ff;
+      --banner-bg: #dfdbcf;
+      --console-bg: #ffffff;
+      --console-text: #000000;
+      --console-border: 2px inset #7f9db9;
+      --btn-bg: #e1e1e1;
+      --btn-text: #000000;
+      --btn-border: #707070;
+      --btn-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #808080;
+      --modal-bg: #ece9d8;
+      --modal-border: #606060;
+    }
+
+    /* GECE MODU (Yüksek kontrastlı, net ayırt edilebilir antrasit/lacivert tonlar) */
+    [data-theme="night"] {
+      --bg-color: #0b0f19;
+      --card-bg: #151d2a;
+      --card-border: #2a3649;
+      --text-main: #ffffff;
+      --text-muted: #94a3b8;
+      --text-label: #38bdf8;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --success: #16a34a;
+      --danger: #ef4444;
+      --input-bg: #090d16;
+      --input-border: #334155;
+      --input-text: #ffffff;
+      --table-header: #1e293b;
+      --table-header-text: #f8fafc;
+      --table-row-even: #151d2a;
+      --table-row-odd: #0e1522;
+      --book-line: #334155;
+      --highlight: #3b82f633;
+      --banner-bg: #0e1522;
+      --console-bg: #070a10;
+      --console-text: #38bdf8;
+      --console-border: 1px solid #2a3649;
+      --btn-bg: #2563eb;
+      --btn-text: #ffffff;
+      --btn-border: #1d4ed8;
+      --btn-shadow: none;
+      --modal-bg: #151d2a;
+      --modal-border: #3b82f6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    html, body {
+      width: 100%;
+      max-width: 100vw;
+      overflow-x: hidden;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 8px 12px;
+      font-size: 12px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ÜST BAŞLIK */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-icon {
+      font-size: 22px;
+    }
+
+    .brand h1 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--accent);
+    }
+
+    .brand span {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: block;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .theme-toggle-btn {
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      border: 1px solid var(--btn-border);
+      box-shadow: var(--btn-shadow);
+      padding: 5px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11.5px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle-btn:hover {
+      filter: brightness(1.1);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--card-border);
+      color: var(--success);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      background-color: var(--success);
+      border-radius: 50%;
+    }
+
+    /* MAIN CONTAINER */
+    .main-container {
+      flex: 1;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 360px minmax(0, 1fr);
+      gap: 10px;
+      align-items: stretch;
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 1024px) {
+      .main-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* KARTLAR */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 10px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-title {
+      font-size: 12.5px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-label);
+    }
+
+    .badge-count {
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-weight: 700;
+    }
+
+    /* FORM & BUTTONS */
+    input[type="text"], input[type="number"], select {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--input-text);
+      padding: 5px 8px;
+      border-radius: 3px;
+      font-size: 11.5px;
+      font-family: inherit;
+      outline: none;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent);
+    }
+
+    .btn {
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      border: 1px solid var(--btn-border);
+      box-shadow: var(--btn-shadow);
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      filter: brightness(1.1);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--btn-border);
+    }
+
+    .btn-secondary {
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      border: 1px solid var(--btn-border);
+    }
+
+    .btn-sm {
+      padding: 4px 8px;
+      font-size: 10.5px;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: #ffffff;
+      border: 1px solid var(--btn-border);
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: #ffffff;
+      border: 1px solid var(--btn-border);
+    }
+
+    /* INVENTORY LIST */
+    .inventory-input-group {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .chart-list-container {
+      flex: 1;
+      min-height: 280px;
+      max-height: 480px;
+      overflow-y: auto;
+      border: 1px solid var(--card-border);
+      border-radius: 4px;
+      background: var(--input-bg);
+      padding: 6px;
+    }
+
+    .chart-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 4px;
+      margin-bottom: 5px;
+      transition: all 0.15s;
+      border-left: 3px solid var(--accent);
+    }
+
+    .chart-item.unchecked {
+      opacity: 0.55;
+      border-left-color: var(--card-border);
+    }
+
+    .chart-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .chart-info input[type="checkbox"] {
+      cursor: pointer;
+      width: 14px;
+      height: 14px;
+      accent-color: var(--accent);
+    }
+
+    .chart-item-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-tag {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 700;
+    }
+    .status-tag.found {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+    .status-tag.not-found {
+      background: rgba(148, 163, 184, 0.15);
+      color: var(--text-muted);
+      border: 1px solid var(--card-border);
+    }
+
+    .btn-delete-item {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 4px;
+      line-height: 1;
+    }
+    .btn-delete-item:hover {
+      color: var(--danger);
+    }
+
+    /* DROPZONE */
+    .dropzone {
+      border: 2px dashed var(--card-border);
+      border-radius: 6px;
+      padding: 24px 16px;
+      text-align: center;
+      background: var(--banner-bg);
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 10px;
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--accent);
+      background: var(--highlight);
+    }
+
+    .dropzone-icon {
+      font-size: 32px;
+      margin-bottom: 6px;
+      color: var(--accent);
+    }
+
+    .dropzone-text {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 4px;
+    }
+
+    .dropzone-subtext {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .dropzone-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* OPTIONS */
+    .options-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+      background: var(--banner-bg);
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+    }
+
+    .option-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+      color: var(--text-main);
+      cursor: pointer;
+    }
+
+    .option-item input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    /* PROGRESS & LOGS */
+    .progress-bar-container {
+      background: var(--input-bg);
+      border-radius: 4px;
+      height: 10px;
+      overflow: hidden;
+      margin: 8px 0 4px 0;
+      border: 1px solid var(--card-border);
+      display: none;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.15s ease;
+    }
+
+    .progress-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: right;
+      display: none;
+      margin-bottom: 6px;
+    }
+
+    .log-box {
+      background: var(--console-bg);
+      border: var(--console-border);
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 11.5px;
+      line-height: 1.45;
+      height: 95px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      color: var(--console-text);
+      font-weight: bold;
+    }
+
+    .btn-run {
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 10px 18px;
+      border-radius: 5px;
+      border: 1px solid var(--btn-border);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      width: 100%;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-run:hover:not(:disabled) {
+      filter: brightness(1.1);
+    }
+    .btn-run:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* RESULTS */
+    .result-section {
+      display: none;
+      margin-top: 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--success);
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .result-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--success);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .result-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .summary-table-container {
+      overflow-x: auto;
+      margin-top: 8px;
+    }
+
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11.5px;
+    }
+
+    .summary-table th, .summary-table td {
+      padding: 6px 10px;
+      text-align: left;
+      border: 1px solid var(--card-border);
+    }
+
+    .summary-table th {
+      background: var(--table-header);
+      color: var(--table-header-text);
+      font-weight: 700;
+    }
+
+    .summary-table tr:nth-child(even) {
+      background: var(--table-row-even);
+    }
+    .summary-table tr:nth-child(odd) {
+      background: var(--table-row-odd);
+    }
+
+    /* FOOTER */
+    .app-footer {
+      margin-top: 10px;
+      padding: 8px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--card-border);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .app-footer a {
+      color: var(--accent);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      transition: opacity 0.15s ease;
+    }
+
+    .app-footer a:hover {
+      text-decoration: underline;
+      opacity: 0.85;
+    }
+
+    .app-footer svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
+    /* Hidden file inputs */
+    input[type="file"] {
+      display: none;
+    }
+  </style>
+</head>
+<body data-theme="night">
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">⚓</div>
+      <div>
+        <h1>ADMIRALTY CHART CORRECTIONS EXTRACTOR</h1>
+        <span>Weekly Notices to Mariners (WKNMs) Automated Page & Chart Tracing Extractor</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="status-badge" id="offlineBadge">
+        <span class="pulse-dot"></span>
+        <span id="offlineStatusText">Offline Ready</span>
+      </div>
+
+      <!-- TEMA BUTONU -->
+      <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()">
+        ☀️ Day Mode
+      </button>
+    </div>
+  </header>
+
+  <div class="main-container">
+    
+    <!-- LEFT PANEL: Ship's Chart Inventory Management -->
+    <div class="card">
+      <div class="card-title">
+        <span>🗺️ Ship's Chart Inventory</span>
+        <span class="badge-count" id="chartCountBadge">0 Charts</span>
+      </div>
+
+      <div class="inventory-input-group">
+        <input type="text" id="newChartInput" placeholder="Chart No (e.g. 1057)..." onkeypress="if(event.key==='Enter') addSingleChart()">
+        <button class="btn btn-primary" onclick="addSingleChart()">Add</button>
+      </div>
+
+      <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+        <input type="text" id="chartSearchInput" placeholder="Search charts in inventory..." style="flex: 1;" oninput="renderChartList()">
+        <button class="btn btn-danger btn-sm" onclick="clearInventory()" title="Clear Entire Inventory">🗑️ Clear</button>
+      </div>
+
+      <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+        <button class="btn btn-secondary btn-sm" style="flex: 1;" onclick="exportInventory()">💾 Export</button>
+        <button class="btn btn-secondary btn-sm" style="flex: 1;" onclick="document.getElementById('importFileInput').click()">📂 Import</button>
+        <input type="file" id="importFileInput" accept=".json,.txt,.csv" style="display:none;" onchange="importInventory(event)">
+      </div>
+
+      <div class="chart-list-container" id="chartListContainer">
+        <!-- Dynamically populated chart items -->
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: File Upload, Options and Processing -->
+    <div class="card">
+      <div class="card-title">
+        <span>📦 Weekly NMs File & Extraction</span>
+        <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);" id="loadedFileInfo">
+          No file loaded yet
+        </span>
+      </div>
+
+      <!-- Drag & Drop Zone -->
+      <div class="dropzone" id="dropzone" onclick="triggerDefaultUpload()">
+        <div class="dropzone-icon">📁</div>
+        <div class="dropzone-text" id="dropzoneMainText">Drop Weekly NM ZIP File, Folder, or PDF Here</div>
+        <div class="dropzone-subtext">Automatically detects Weekly Bulletin (WKNM / Section II) and chart tracings</div>
+        
+        <div class="dropzone-buttons" onclick="event.stopPropagation()">
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('zipFileInput').click()">
+            📦 ZIP File (.zip)
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('folderInput').click()">
+            📂 Select Folder
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('pdfFileInput').click()">
+            📄 PDF File (.pdf)
+          </button>
+        </div>
+      </div>
+
+      <!-- Hidden file inputs -->
+      <input type="file" id="zipFileInput" accept=".zip" onchange="handleZipSelected(event)">
+      <input type="file" id="folderInput" webkitdirectory directory multiple onchange="handleFolderSelected(event)">
+      <input type="file" id="pdfFileInput" accept=".pdf" multiple onchange="handlePdfSelected(event)">
+
+      <!-- Extraction Options -->
+      <div class="options-grid">
+        <label class="option-item">
+          <input type="checkbox" id="optCover" checked>
+          <span>Cover Page (Page 1)</span>
+        </label>
+        <label class="option-item">
+          <input type="checkbox" id="optPubList" checked>
+          <span>Charts affected by Publication List</span>
+        </label>
+        <label class="option-item">
+          <input type="checkbox" id="optIndex" checked>
+          <span>INDEX OF CHARTS AFFECTED Pages</span>
+        </label>
+        <label class="option-item">
+          <input type="checkbox" id="optNotices" checked>
+          <span>Chart Correction Pages (Section II)</span>
+        </label>
+        <label class="option-item">
+          <input type="checkbox" id="optSummaryPage" checked>
+          <span>📋 Chart Corrections Summary & Endorsement Checklist</span>
+        </label>
+        <label class="option-item">
+          <input type="checkbox" id="optTracings" checked>
+          <span>Append Chart Tracings to PDF (if available)</span>
+        </label>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="progress-bar-container" id="progressBarContainer">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div class="progress-text" id="progressText">Ready</div>
+
+      <!-- Log Output Box -->
+      <div class="log-box" id="logBox">
+        [System] Ready. Please upload a weekly NM ZIP pack, folder or PDF file.
+      </div>
+
+      <!-- Start Extraction Button -->
+      <button class="btn btn-run" id="btnRun" onclick="startExtraction()" disabled>
+        🚀 Scan Charts & Generate Corrections PDF
+      </button>
+
+      <!-- Results & Download Section -->
+      <div class="result-section" id="resultSection">
+        <div class="result-header">
+          <div class="result-title">
+            <span>✅ Corrections PDF Generated Successfully!</span>
+          </div>
+          <div class="result-actions">
+            <button class="btn btn-success btn-sm" onclick="downloadResultPdf()">
+              📥 Download PDF
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="printResultPdf()">
+              🖨️ Direct Print
+            </button>
+          </div>
+        </div>
+
+        <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;" id="resultStats">
+          <!-- Dynamic stats -->
+        </div>
+
+        <div class="summary-table-container">
+          <table class="summary-table" id="summaryTable">
+            <thead>
+              <tr>
+                <th>Chart No</th>
+                <th>Status</th>
+                <th>Bulletin Page</th>
+                <th>Notice (NM) No</th>
+                <th>Tracing Status</th>
+              </tr>
+            </thead>
+            <tbody id="summaryTableBody">
+              <!-- Dynamically populated results -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Hidden Iframe for Direct Printing -->
+  <iframe id="printIframe" style="display:none;"></iframe>
+
+  <!-- FOOTER -->
+  <footer class="app-footer no-print">
+    <div>
+      <span>Admiralty Chart Corrections Extractor</span>
+    </div>
+    <div>
+      <a href="https://github.com/yigitalpsari" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+        <span>https://github.com/yigitalpsari</span>
+      </a>
+    </div>
+  </footer>
+
+  <script>
+    // Worker configuration
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = './lib/pdf.worker.min.js';
+    }
+
+    // TEMA YÖNETİMİ
+    function updateThemeButton(theme) {
+      const btn = document.getElementById("themeToggleBtn");
+      if (!btn) return;
+      if (theme === "night") {
+        btn.innerHTML = "☀️ Day Mode";
+        btn.title = "Switch to Day Mode (Classic Windows)";
+      } else {
+        btn.innerHTML = "🌙 Night Mode";
+        btn.title = "Switch to Night Mode (High Contrast Dark)";
+      }
+    }
+
+    function setTheme(theme) {
+      document.body.setAttribute("data-theme", theme);
+      localStorage.setItem("admiralty_theme", theme);
+      updateThemeButton(theme);
+    }
+
+    function toggleTheme() {
+      const current = document.body.getAttribute("data-theme") || "night";
+      const next = current === "night" ? "day" : "night";
+      setTheme(next);
+    }
+
+    // Application State
+    let inventory = [];
+    let loadedFiles = {
+      mainPdfBuffer: null,
+      mainPdfName: "",
+      tracings: {}
+    };
+    let generatedPdfBytes = null;
+    let generatedPdfBlobUrl = null;
+
+    // Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedTheme = localStorage.getItem("admiralty_theme") || "night";
+      setTheme(savedTheme);
+
+      loadInventoryFromStorage();
+      setupDragAndDrop();
+    });
+
+    function log(msg) {
+      const box = document.getElementById('logBox');
+      const time = new Date().toLocaleTimeString();
+      box.innerHTML += `[${time}] ${msg}\n`;
+      box.scrollTop = box.scrollHeight;
+    }
+
+    // Inventory Management (Starts EMPTY if no user data saved)
+    function loadInventoryFromStorage() {
+      const saved = localStorage.getItem('admiralty_nm_inventory_v1') || localStorage.getItem('admiralty_nm_chart_inventory_v2');
+      if (saved) {
+        try {
+          inventory = JSON.parse(saved);
+        } catch (e) {
+          inventory = [];
+        }
+      } else {
+        inventory = [];
+      }
+      renderChartList();
+    }
+
+    function saveInventoryToStorage() {
+      localStorage.setItem('admiralty_nm_inventory_v1', JSON.stringify(inventory));
+      localStorage.setItem('admiralty_nm_chart_inventory_v2', JSON.stringify(inventory));
+      renderChartList();
+    }
+
+    function addSingleChart() {
+      const input = document.getElementById('newChartInput');
+      const val = input.value.trim();
+      if (!val) return;
+      
+      const cleanVal = val.toUpperCase();
+      if (inventory.some(item => item.number === cleanVal)) {
+        alert("This chart number is already in your inventory: " + cleanVal);
+        return;
+      }
+      inventory.unshift({ number: cleanVal, checked: true, lastStatus: null });
+      input.value = "";
+      saveInventoryToStorage();
+      log(`Chart ${cleanVal} added to inventory.`);
+    }
+
+    function removeChart(num) {
+      inventory = inventory.filter(item => item.number !== num);
+      saveInventoryToStorage();
+      log(`Chart ${num} removed from inventory.`);
+    }
+
+    function toggleChart(num) {
+      const item = inventory.find(i => i.number === num);
+      if (item) {
+        item.checked = !item.checked;
+        saveInventoryToStorage();
+      }
+    }
+
+    function clearInventory() {
+      if (inventory.length === 0) return;
+      if (confirm("Are you sure you want to clear your entire chart inventory?")) {
+        inventory = [];
+        saveInventoryToStorage();
+        log("Chart inventory cleared.");
+      }
+    }
+
+    function renderChartList() {
+      const container = document.getElementById('chartListContainer');
+      const search = (document.getElementById('chartSearchInput').value || '').trim().toUpperCase();
+      const badge = document.getElementById('chartCountBadge');
+      
+      const filtered = inventory.filter(i => !search || i.number.includes(search));
+      badge.textContent = `${inventory.length} Chart${inventory.length !== 1 ? 's' : ''}`;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 11.5px;">${inventory.length === 0 ? 'No charts in inventory. Add chart numbers above or import a list.' : 'No matching charts found.'}</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(item => `
+        <div class="chart-item ${item.checked ? '' : 'unchecked'}">
+          <div class="chart-info">
+            <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleChart('${item.number}')">
+            <span>Chart ${item.number}</span>
+          </div>
+          <div class="chart-item-actions">
+            ${item.lastStatus ? `
+              <span class="status-tag ${item.lastStatus.found ? 'found' : 'not-found'}">
+                ${item.lastStatus.found ? 'Correction Found' : 'Nil'}
+              </span>
+            ` : ''}
+            <button class="btn-delete-item" onclick="removeChart('${item.number}')" title="Delete">✕</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function exportInventory() {
+      if (inventory.length === 0) {
+        alert("Inventory is empty!");
+        return;
+      }
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(inventory, null, 2));
+      const dl = document.createElement('a');
+      dl.setAttribute("href", dataStr);
+      dl.setAttribute("download", `Ship_Chart_Inventory_${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(dl);
+      dl.click();
+      dl.remove();
+      log("Chart inventory exported.");
+    }
+
+    function importInventory(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const content = e.target.result;
+          let addedCount = 0;
+
+          if (file.name.endsWith('.json')) {
+            const parsed = JSON.parse(content);
+            if (Array.isArray(parsed)) {
+              parsed.forEach(p => {
+                const num = (p.number || p.chart || p).toString().trim().toUpperCase();
+                if (num && !inventory.some(i => i.number === num)) {
+                  inventory.push({ number: num, checked: p.checked !== false, lastStatus: null });
+                  addedCount++;
+                }
+              });
+            }
+          } else {
+            const lines = content.split(/[\r\n,;]+/);
+            lines.forEach(line => {
+              const num = line.trim().toUpperCase();
+              if (num && /^\d+[A-Z]?$/i.test(num) && !inventory.some(i => i.number === num)) {
+                inventory.push({ number: num, checked: true, lastStatus: null });
+                addedCount++;
+              }
+            });
+          }
+
+          saveInventoryToStorage();
+          log(`Import completed. ${addedCount} new charts added to inventory.`);
+          alert(`Successfully imported ${addedCount} new charts!`);
+        } catch (err) {
+          alert("Error reading import file: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = "";
+    }
+
+    // Drag & Drop Handlers
+    function setupDragAndDrop() {
+      const dropzone = document.getElementById('dropzone');
+
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, preventDefaults, false);
+      });
+
+      function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, () => dropzone.classList.add('dragover'), false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, () => dropzone.classList.remove('dragover'), false);
+      });
+
+      dropzone.addEventListener('drop', handleDrop, false);
+    }
+
+    function triggerDefaultUpload() {
+      document.getElementById('zipFileInput').click();
+    }
+
+    function handleDrop(e) {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (!files || files.length === 0) return;
+
+      if (files.length === 1 && files[0].name.toLowerCase().endsWith('.zip')) {
+        processZip(files[0]);
+      } else if (files.length === 1 && files[0].name.toLowerCase().endsWith('.pdf')) {
+        processPdf(files[0]);
+      } else {
+        processMultipleFiles(Array.from(files));
+      }
+    }
+
+    function handleZipSelected(e) {
+      const file = e.target.files[0];
+      if (file) processZip(file);
+      e.target.value = "";
+    }
+
+    function handleFolderSelected(e) {
+      const files = Array.from(e.target.files);
+      if (files.length > 0) processMultipleFiles(files);
+      e.target.value = "";
+    }
+
+    function handlePdfSelected(e) {
+      const files = Array.from(e.target.files);
+      if (files.length === 1) {
+        processPdf(files[0]);
+      } else if (files.length > 1) {
+        processMultipleFiles(files);
+      }
+      e.target.value = "";
+    }
+
+    // Processing Files
+    async function processZip(zipFile) {
+      log(`Opening ZIP file: ${zipFile.name}...`);
+      loadedFiles = { mainPdfBuffer: null, mainPdfName: "", tracings: {} };
+      document.getElementById('loadedFileInfo').textContent = `Loaded: ${zipFile.name}`;
+
+      try {
+        const zip = await JSZip.loadAsync(zipFile);
+        const pdfFiles = [];
+
+        zip.forEach((relPath, entry) => {
+          if (!entry.dir && relPath.toLowerCase().endsWith('.pdf')) {
+            pdfFiles.push(entry);
+          }
+        });
+
+        log(`ZIP contains ${pdfFiles.length} PDF files.`);
+
+        let mainEntry = pdfFiles.find(e => /wknm\d+\.pdf$/i.test(e.name) || /wknm.*\.pdf$/i.test(e.name));
+        if (!mainEntry) {
+          mainEntry = pdfFiles.find(e => /snii\d+\.pdf$/i.test(e.name) || /section.*ii.*\.pdf$/i.test(e.name));
+        }
+        if (!mainEntry && pdfFiles.length > 0) {
+          mainEntry = pdfFiles[0];
+        }
+
+        if (mainEntry) {
+          log(`Identified main weekly bulletin: ${mainEntry.name}`);
+          loadedFiles.mainPdfName = mainEntry.name;
+          loadedFiles.mainPdfBuffer = await mainEntry.async("arraybuffer");
+        } else {
+          throw new Error("No Admiralty Weekly Bulletin PDF found inside ZIP file!");
+        }
+
+        let tracingCount = 0;
+        for (const entry of pdfFiles) {
+          if (entry === mainEntry) continue;
+          const match = entry.name.match(/Chart([A-Za-z0-9]+)NM/i) || entry.name.match(/([A-Za-z0-9]+)_tracing/i);
+          if (match) {
+            const chartNum = match[1].toUpperCase();
+            loadedFiles.tracings[chartNum] = await entry.async("arraybuffer");
+            tracingCount++;
+          }
+        }
+        log(`Loaded ${tracingCount} chart tracings from ZIP.`);
+
+        document.getElementById('dropzoneMainText').textContent = `Ready: ${zipFile.name}`;
+        document.getElementById('btnRun').disabled = false;
+        log("File ready. Click the scan button below to proceed.");
+
+      } catch (err) {
+        alert("Error reading ZIP file: " + err.message);
+        log("ERROR: " + err.message);
+      }
+    }
+
+    async function processMultipleFiles(fileList) {
+      log(`Analyzing ${fileList.length} files...`);
+      loadedFiles = { mainPdfBuffer: null, mainPdfName: "", tracings: {} };
+
+      const pdfFiles = fileList.filter(f => f.name.toLowerCase().endsWith('.pdf'));
+      if (pdfFiles.length === 0) {
+        alert("No PDF files found in the selection!");
+        return;
+      }
+
+      let mainFile = pdfFiles.find(f => /wknm\d+\.pdf$/i.test(f.name) || /wknm.*\.pdf$/i.test(f.name));
+      if (!mainFile) {
+        mainFile = pdfFiles.find(f => /snii\d+\.pdf$/i.test(f.name) || /section.*ii.*\.pdf$/i.test(f.name));
+      }
+      if (!mainFile) {
+        mainFile = pdfFiles[0];
+      }
+
+      log(`Main bulletin selected: ${mainFile.name}`);
+      loadedFiles.mainPdfName = mainFile.name;
+      loadedFiles.mainPdfBuffer = await mainFile.arrayBuffer();
+      document.getElementById('loadedFileInfo').textContent = `Loaded: ${mainFile.name}`;
+
+      let tracingCount = 0;
+      for (const f of pdfFiles) {
+        if (f === mainFile) continue;
+        const match = f.name.match(/Chart([A-Za-z0-9]+)NM/i) || f.name.match(/([A-Za-z0-9]+)_tracing/i);
+        if (match) {
+          const chartNum = match[1].toUpperCase();
+          loadedFiles.tracings[chartNum] = await f.arrayBuffer();
+          tracingCount++;
+        }
+      }
+      log(`Loaded ${tracingCount} chart tracings.`);
+
+      document.getElementById('dropzoneMainText').textContent = `Ready: ${mainFile.name}`;
+      document.getElementById('btnRun').disabled = false;
+      log("Files ready. Click the scan button below to proceed.");
+    }
+
+    async function processPdf(file) {
+      log(`Opening PDF file: ${file.name}...`);
+      loadedFiles = { mainPdfBuffer: null, mainPdfName: "", tracings: {} };
+      document.getElementById('loadedFileInfo').textContent = `Loaded: ${file.name}`;
+
+      try {
+        loadedFiles.mainPdfName = file.name;
+        loadedFiles.mainPdfBuffer = await file.arrayBuffer();
+        document.getElementById('dropzoneMainText').textContent = `Ready: ${file.name}`;
+        document.getElementById('btnRun').disabled = false;
+        log("PDF loaded successfully. Click the scan button below to proceed.");
+      } catch (err) {
+        alert("Error loading PDF: " + err.message);
+        log("ERROR: " + err.message);
+      }
+    }
+
+    // Accurate Chart Heading Verification
+    function isChartHeadingInPage(pageText, chartNum) {
+      if (!pageText || !chartNum) return false;
+      const escNum = chartNum.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      const p1 = new RegExp(`\\bCharts?\\s+(?:(?:[A-Za-z]{1,5}|INT)\\s+)?0*${escNum}(?:[a-zA-Z]|\\b)(?!\\s*\\/\\s*\\d)`, 'i');
+      const p2 = new RegExp(`\\b0*${escNum}(?:[a-zA-Z]|\\b)(?:\\s*\\([^)]*\\))?\\s*\\[\\s*previous\\s+update`, 'i');
+
+      if (!p1.test(pageText) && !p2.test(pageText)) {
+        return false;
+      }
+
+      const regexInstance = new RegExp(`\\b0*${escNum}(?:[a-zA-Z]|\\b)`, 'gi');
+      let match;
+      let hasValidHeading = false;
+
+      while ((match = regexInstance.exec(pageText)) !== null) {
+        const idx = match.index;
+        const matchedStr = match[0];
+        const textBefore = pageText.substring(Math.max(0, idx - 60), idx);
+        const textAfter = pageText.substring(idx + matchedStr.length, Math.min(pageText.length, idx + matchedStr.length + 60));
+
+        if (/previous\s+update\s*[^\n\r\]]*$/i.test(textBefore)) {
+          continue;
+        }
+        if (/^\s*\/\s*\d{2}\b/.test(textAfter)) {
+          continue;
+        }
+
+        const isPrecededByChart = /\bCharts?\s+(?:(?:[A-Za-z]{1,5}|INT)\s+)?$/i.test(textBefore);
+        const isFollowedByPrevUpdate = /^\s*(?:\([^)]*\)\s*)?\[\s*previous\s+update/i.test(textAfter);
+
+        if (isPrecededByChart || isFollowedByPrevUpdate) {
+          hasValidHeading = true;
+          break;
+        }
+      }
+
+      return hasValidHeading;
+    }
+
+    // Extraction & Assembly Engine
+    async function startExtraction() {
+      if (!loadedFiles.mainPdfBuffer) {
+        alert("Please load a weekly NM ZIP pack or PDF first!");
+        return;
+      }
+
+      const activeCharts = inventory.filter(i => i.checked);
+      if (activeCharts.length === 0) {
+        alert("Please add and check at least one chart in your inventory to scan!");
+        return;
+      }
+
+      const optCover = document.getElementById('optCover').checked;
+      const optPubList = document.getElementById('optPubList').checked;
+      const optIndex = document.getElementById('optIndex').checked;
+      const optNotices = document.getElementById('optNotices').checked;
+      const optSummaryPage = document.getElementById('optSummaryPage').checked;
+      const optTracings = document.getElementById('optTracings').checked;
+
+      const btnRun = document.getElementById('btnRun');
+      btnRun.disabled = true;
+      btnRun.textContent = "⏳ Scanning Bulletin & Assembling PDF...";
+
+      const progContainer = document.getElementById('progressBarContainer');
+      const progressBar = document.getElementById('progressBar');
+      const progText = document.getElementById('progressText');
+      progContainer.style.display = 'block';
+      progText.style.display = 'block';
+
+      log("=== Extraction Process Started ===");
+
+      try {
+        const pdfJsData = new Uint8Array(loadedFiles.mainPdfBuffer.slice(0));
+        const pdfDoc = await pdfjsLib.getDocument({ data: pdfJsData }).promise;
+        const totalPages = pdfDoc.numPages;
+        log(`PDF loaded. Scanning ${totalPages} pages for ${activeCharts.length} active charts...`);
+
+        const pagesToInclude = new Set();
+        const chartResults = {};
+        const indexPageFullTexts = [];
+        activeCharts.forEach(c => {
+          chartResults[c.number] = { found: false, pages: [], pdfPages: [], notices: [], hasTracing: false };
+        });
+
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+          const percent = Math.round((pageNum / totalPages) * 100);
+          progressBar.style.width = percent + '%';
+          progText.textContent = `Scanning page ${pageNum} of ${totalPages} (${percent}%)`;
+
+          const page = await pdfDoc.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map(item => item.str).join(' ');
+
+          if (pageNum === 1) {
+            if (optCover) {
+              pagesToInclude.add(pageNum);
+              log(`Page 1: Cover page added.`);
+            }
+            continue;
+          }
+
+          const isExplanatoryNotes = /EXPLANATORY\s+NOTES/i.test(pageText);
+          const isHydrographicNote = /HYDROGRAPHIC\s+NOTE/i.test(pageText) || /\bH\.?102\b/i.test(pageText);
+          if (isExplanatoryNotes || isHydrographicNote) {
+            log(`Page ${pageNum}: Non-essential page skipped (${isExplanatoryNotes ? 'Explanatory Notes' : 'Hydrographic Note / H.102'}).`);
+            continue;
+          }
+
+          const isPubList = /Charts\s+affected\s+by\s+the\s+Publication\s+List/i.test(pageText);
+          if (isPubList && optPubList) {
+            pagesToInclude.add(pageNum);
+            log(`Page ${pageNum}: 'Charts affected by the Publication List' identified and added.`);
+          }
+
+          const isIndexPage = /INDEX\s+OF\s+CHARTS\s+AFFECTED/i.test(pageText);
+          if (isIndexPage) {
+            indexPageFullTexts.push(pageText);
+            if (optIndex) {
+              pagesToInclude.add(pageNum);
+              log(`Page ${pageNum}: 'INDEX OF CHARTS AFFECTED' index page added.`);
+            }
+          }
+
+          if (optNotices && !isIndexPage && !isPubList) {
+            let bulletinPageLabel = "";
+            const items = textContent.items;
+            const edgeIndices = [0, 1, 2, 3, items.length - 1, items.length - 2, items.length - 3];
+            for (const idx of edgeIndices) {
+              if (items[idx] && items[idx].str) {
+                const m = items[idx].str.trim().match(/\b(2\.\d+)\b/);
+                if (m) { bulletinPageLabel = m[1]; break; }
+              }
+            }
+            if (!bulletinPageLabel) {
+              const mSec = pageText.match(/SECTION\s+II[^\d]{1,25}(\b2\.\d+\b)/i) || pageText.match(/\b2\.\d+\b/);
+              if (mSec) bulletinPageLabel = mSec[1] || mSec[0];
+            }
+            if (!bulletinPageLabel) bulletinPageLabel = String(pageNum);
+
+            for (const chart of activeCharts) {
+              const num = chart.number;
+              const escNum = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+              if (isChartHeadingInPage(pageText, num)) {
+                chartResults[num].found = true;
+                if (!chartResults[num].pdfPages.includes(pageNum)) {
+                  chartResults[num].pdfPages.push(pageNum);
+                }
+                if (!chartResults[num].pages.includes(bulletinPageLabel)) {
+                  chartResults[num].pages.push(bulletinPageLabel);
+                }
+
+                const chartPos = pageText.search(new RegExp(`\\bCharts?\\s+(?:(?:[A-Za-z]{1,5}|INT)\\s+)?0*${escNum}(?:[a-zA-Z]|\\b)|\\b0*${escNum}(?:[a-zA-Z]|\\b)(?:\\s*\\([^)]*\\))?\\s*\\[\\s*previous`, 'i'));
+                if (chartPos > 0) {
+                  const textBefore = pageText.substring(Math.max(0, chartPos - 500), chartPos);
+                  const headerMatches = Array.from(textBefore.matchAll(/\b(\d{4,5}[A-Za-z\*]?)\b(?:\s+[A-Z\s\-]{3,})?/g));
+                  if (headerMatches.length > 0) {
+                    for (let mIdx = headerMatches.length - 1; mIdx >= 0; mIdx--) {
+                      const cand = headerMatches[mIdx][1];
+                      const candIdx = headerMatches[mIdx].index;
+                      const candAfter = textBefore.substring(candIdx + cand.length, Math.min(textBefore.length, candIdx + cand.length + 10));
+                      if (!/^\s*\/\s*\d{2}\b/.test(candAfter) && cand !== num && !cand.startsWith(num)) {
+                        if (!chartResults[num].notices.includes(cand)) {
+                          chartResults[num].notices.push(cand);
+                        }
+                        break;
+                      }
+                    }
+                  }
+                }
+
+                log(`-> Bulletin Page ${bulletinPageLabel} (PDF Page ${pageNum}): Correction found for Chart ${num}.`);
+              }
+            }
+          }
+        }
+
+        const combinedIndexText = indexPageFullTexts.join(' ');
+        activeCharts.forEach(c => {
+          const num = c.number;
+          const escNum = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`\\b0*${escNum}\\b[^a-zA-Z0-9]{1,35}(\\d{4,5}[A-Za-z\*]?(?:\\s*[,/&]\\s*\\d{4,5}[A-Za-z\*]?)*)`, 'g');
+          let match;
+          while ((match = regex.exec(combinedIndexText)) !== null) {
+            const rawNms = match[1].split(/[,/&]/);
+            for (const raw of rawNms) {
+              const clean = raw.trim();
+              if (clean && clean !== num && !clean.startsWith(num)) {
+                if (!chartResults[num].notices.includes(clean)) {
+                  chartResults[num].notices.unshift(clean);
+                }
+              }
+            }
+          }
+        });
+
+        if (indexPageFullTexts.length > 0) {
+          activeCharts.forEach(c => {
+            const res = chartResults[c.number];
+            if (res.found && res.notices.length === 0) {
+              log(`⚠️ False positive cancelled: Chart ${c.number} is not listed in INDEX OF CHARTS AFFECTED.`);
+              res.found = false;
+              res.pages = [];
+              res.pdfPages = [];
+            }
+          });
+        }
+
+        if (optNotices) {
+          activeCharts.forEach(c => {
+            const res = chartResults[c.number];
+            if (res.found && res.pdfPages) {
+              res.pdfPages.forEach(p => pagesToInclude.add(p));
+            }
+          });
+        }
+
+        activeCharts.forEach(c => {
+          const res = chartResults[c.number];
+          if (loadedFiles.tracings[c.number]) {
+            res.hasTracing = true;
+          }
+          c.lastStatus = {
+            found: res.found,
+            text: res.found ? `Page ${res.pages.join(', ')}` : 'Nil'
+          };
+        });
+        saveInventoryToStorage();
+
+        progText.textContent = "Merging pages into new PDF...";
+        const pdfLibData = new Uint8Array(loadedFiles.mainPdfBuffer.slice(0));
+        const srcDoc = await PDFLib.PDFDocument.load(pdfLibData);
+        const outDoc = await PDFLib.PDFDocument.create();
+
+        const sortedPageNums = Array.from(pagesToInclude).sort((a, b) => a - b);
+        log(`Transferring ${sortedPageNums.length} extracted pages into output PDF...`);
+
+        const pageIndices = sortedPageNums.map(n => n - 1);
+        const copiedPages = await outDoc.copyPages(srcDoc, pageIndices);
+        copiedPages.forEach(p => outDoc.addPage(p));
+
+        let attachedTracingsCount = 0;
+        if (optTracings) {
+          for (const chart of activeCharts) {
+            if (chartResults[chart.number].found && loadedFiles.tracings[chart.number]) {
+              try {
+                const tracingData = new Uint8Array(loadedFiles.tracings[chart.number].slice(0));
+                const tDoc = await PDFLib.PDFDocument.load(tracingData);
+                const tPages = await outDoc.copyPages(tDoc, tDoc.getPageIndices());
+                tPages.forEach(p => outDoc.addPage(p));
+                attachedTracingsCount++;
+                log(`Tracing PDF attached for Chart ${chart.number}.`);
+              } catch (e) {
+                console.warn(`Could not attach tracing for Chart ${chart.number}:`, e);
+              }
+            }
+          }
+        }
+
+        let addedSummaryPageCount = 0;
+        if (optSummaryPage) {
+          progText.textContent = "Generating bridge endorsement checklist page...";
+          let summaryPage = outDoc.addPage([595.28, 841.89]);
+          const fontBold = await outDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+          const fontRegular = await outDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+          
+          const width = summaryPage.getWidth();
+          const height = summaryPage.getHeight();
+          
+          summaryPage.drawText("WEEKLY CHART CORRECTIONS & BRIDGE ENDORSEMENT LIST", {
+            x: 40,
+            y: height - 50,
+            size: 14,
+            font: fontBold,
+            color: PDFLib.rgb(0, 0, 0)
+          });
+          
+          const todayStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+          const bulletinName = loadedFiles.mainPdfName.replace('.pdf', '');
+          summaryPage.drawText(`Bulletin: ${bulletinName}    |    Date: ${todayStr}    |    SOLAS Chapter V Compliance`, {
+            x: 40,
+            y: height - 68,
+            size: 9.5,
+            font: fontRegular,
+            color: PDFLib.rgb(0, 0, 0)
+          });
+
+          summaryPage.drawLine({
+            start: { x: 40, y: height - 76 },
+            end: { x: width - 40, y: height - 76 },
+            thickness: 1,
+            color: PDFLib.rgb(0, 0, 0)
+          });
+
+          let y = height - 98;
+          summaryPage.drawLine({ start: { x: 40, y: y + 8 }, end: { x: width - 40, y: y + 8 }, thickness: 1, color: PDFLib.rgb(0, 0, 0) });
+          summaryPage.drawLine({ start: { x: 40, y: y - 14 }, end: { x: width - 40, y: y - 14 }, thickness: 1, color: PDFLib.rgb(0, 0, 0) });
+
+          summaryPage.drawText("[   ]", { x: 50, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+          summaryPage.drawText("CHART NO", { x: 100, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+          summaryPage.drawText("NOTICE (NM) NO", { x: 220, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+          summaryPage.drawText("BULLETIN PAGE", { x: 400, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+
+          y -= 24;
+
+          const correctedCharts = activeCharts.filter(c => chartResults[c.number].found);
+          const uncorrectedCharts = activeCharts.filter(c => !chartResults[c.number].found);
+
+          if (correctedCharts.length === 0) {
+            summaryPage.drawText("No chart corrections found in this weekly bulletin for your selected inventory.", {
+              x: 40,
+              y: y - 10,
+              size: 10,
+              font: fontRegular,
+              color: PDFLib.rgb(0, 0, 0)
+            });
+            y -= 30;
+          } else {
+            for (let i = 0; i < correctedCharts.length; i++) {
+              if (y < 60) {
+                summaryPage = outDoc.addPage([595.28, 841.89]);
+                y = height - 50;
+                addedSummaryPageCount++;
+                summaryPage.drawLine({ start: { x: 40, y: y + 8 }, end: { x: width - 40, y: y + 8 }, thickness: 1, color: PDFLib.rgb(0, 0, 0) });
+                summaryPage.drawLine({ start: { x: 40, y: y - 14 }, end: { x: width - 40, y: y - 14 }, thickness: 1, color: PDFLib.rgb(0, 0, 0) });
+                summaryPage.drawText("[   ]", { x: 50, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+                summaryPage.drawText("CHART NO", { x: 100, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+                summaryPage.drawText("NOTICE (NM) NO", { x: 220, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+                summaryPage.drawText("BULLETIN PAGE", { x: 400, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+                y -= 24;
+              }
+              const c = correctedCharts[i];
+              const res = chartResults[c.number];
+
+              summaryPage.drawRectangle({
+                x: 52,
+                y: y - 11,
+                width: 12,
+                height: 12,
+                borderColor: PDFLib.rgb(0, 0, 0),
+                borderWidth: 1
+              });
+
+              summaryPage.drawText(`Chart ${c.number}`, {
+                x: 100,
+                y: y - 9,
+                size: 9.5,
+                font: fontBold,
+                color: PDFLib.rgb(0, 0, 0)
+              });
+
+              const cleanNotices = res.notices.length > 0 ? res.notices.map(n => n.startsWith('NM') ? n : `NM ${n}`).join(', ') : 'Correction Found';
+              summaryPage.drawText(cleanNotices.slice(0, 32), {
+                x: 220,
+                y: y - 9,
+                size: 9,
+                font: fontRegular,
+                color: PDFLib.rgb(0, 0, 0)
+              });
+
+              const pageStr = res.pages.length > 0 ? res.pages.join(', ') : '-';
+              summaryPage.drawText(pageStr, {
+                x: 400,
+                y: y - 9,
+                size: 9,
+                font: fontRegular,
+                color: PDFLib.rgb(0, 0, 0)
+              });
+
+              summaryPage.drawLine({
+                start: { x: 40, y: y - 16 },
+                end: { x: width - 40, y: y - 16 },
+                thickness: 0.5,
+                color: PDFLib.rgb(0.7, 0.7, 0.7)
+              });
+
+              y -= 22;
+            }
+          }
+
+          if (uncorrectedCharts.length > 0) {
+            if (y < 80) {
+              summaryPage = outDoc.addPage([595.28, 841.89]);
+              y = height - 50;
+              addedSummaryPageCount++;
+            }
+            y -= 16;
+            summaryPage.drawText(`CHARTS WITH NO CORRECTIONS THIS WEEK (NIL - ${uncorrectedCharts.length} CHARTS):`, {
+              x: 40,
+              y: y,
+              size: 9,
+              font: fontBold,
+              color: PDFLib.rgb(0, 0, 0)
+            });
+            y -= 14;
+
+            const uncorrectedNumbers = uncorrectedCharts.map(c => c.number);
+            let currentLine = "";
+            const lines = [];
+            for (let i = 0; i < uncorrectedNumbers.length; i++) {
+              const num = uncorrectedNumbers[i];
+              const testLine = currentLine ? `${currentLine}, ${num}` : num;
+              if (testLine.length > 85) {
+                lines.push(currentLine + ",");
+                currentLine = num;
+              } else {
+                currentLine = testLine;
+              }
+            }
+            if (currentLine) {
+              lines.push(currentLine);
+            }
+
+            for (const line of lines) {
+              if (y < 45) {
+                summaryPage = outDoc.addPage([595.28, 841.89]);
+                y = height - 50;
+                addedSummaryPageCount++;
+              }
+              summaryPage.drawText(line, {
+                x: 40,
+                y: y,
+                size: 8.5,
+                font: fontRegular,
+                color: PDFLib.rgb(0.2, 0.2, 0.2)
+              });
+              y -= 12;
+            }
+          }
+
+          if (y < 70) {
+            summaryPage = outDoc.addPage([595.28, 841.89]);
+            y = height - 50;
+            addedSummaryPageCount++;
+          }
+          y -= 20;
+          summaryPage.drawLine({
+            start: { x: 40, y: y },
+            end: { x: width - 40, y: y },
+            thickness: 1,
+            color: PDFLib.rgb(0, 0, 0)
+          });
+          y -= 16;
+          summaryPage.drawText("Applied & Verified by Navigating Officer: __________________________   Signature: ________________   Date: ____________", {
+            x: 40,
+            y: y,
+            size: 8.5,
+            font: fontRegular,
+            color: PDFLib.rgb(0, 0, 0)
+          });
+
+          addedSummaryPageCount++;
+          log("Bridge endorsement checklist page appended to PDF.");
+        }
+
+        generatedPdfBytes = await outDoc.save();
+        const blob = new Blob([generatedPdfBytes], { type: 'application/pdf' });
+        if (generatedPdfBlobUrl) URL.revokeObjectURL(generatedPdfBlobUrl);
+        generatedPdfBlobUrl = URL.createObjectURL(blob);
+
+        log(`=== PROCESS COMPLETED ===`);
+        log(`Original: ${totalPages} pages -> Extracted PDF: ${sortedPageNums.length + attachedTracingsCount + addedSummaryPageCount} pages.`);
+
+        renderResults(sortedPageNums, totalPages, chartResults, attachedTracingsCount, addedSummaryPageCount);
+
+      } catch (err) {
+        alert("Extraction error: " + err.message);
+        log("ERROR: " + err.message);
+        console.error(err);
+      } finally {
+        btnRun.disabled = false;
+        btnRun.textContent = "🚀 Scan Charts & Generate Corrections PDF";
+      }
+    }
+
+    function renderResults(sortedPages, origTotal, chartResults, tracingsCount, summaryPageCount = 0) {
+      const section = document.getElementById('resultSection');
+      section.style.display = 'block';
+
+      const foundCount = Object.values(chartResults).filter(r => r.found).length;
+      const totalChecked = Object.keys(chartResults).length;
+      const finalPageCount = sortedPages.length + tracingsCount + summaryPageCount;
+
+      document.getElementById('resultStats').innerHTML = `
+        <strong>Summary:</strong> Found corrections for <strong>${foundCount} of ${totalChecked}</strong> active charts.
+        Original bulletin reduced from <strong>${origTotal} pages to ${finalPageCount} pages</strong> 
+        (<strong>${Math.round((1 - finalPageCount / origTotal) * 100)}%</strong> paper saved).
+      `;
+
+      const tbody = document.getElementById('summaryTableBody');
+      tbody.innerHTML = Object.entries(chartResults).map(([chartNum, res]) => `
+        <tr>
+          <td><strong>Chart ${chartNum}</strong></td>
+          <td>
+            <span class="status-tag ${res.found ? 'found' : 'not-found'}">
+              ${res.found ? '✅ Correction Found' : '⚪ Nil'}
+            </span>
+          </td>
+          <td>${res.found ? res.pages.join(', ') : '-'}</td>
+          <td>${res.notices.length > 0 ? res.notices.map(n => n.startsWith('NM') ? n : `NM ${n}`).join(', ') : '-'}</td>
+          <td>${res.hasTracing ? '📐 Tracing Attached' : '-'}</td>
+        </tr>
+      `).join('');
+
+      section.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function downloadResultPdf() {
+      if (!generatedPdfBlobUrl) return;
+      const a = document.createElement('a');
+      a.href = generatedPdfBlobUrl;
+      const weekName = loadedFiles.mainPdfName.replace('.pdf', '') || 'Weekly';
+      a.download = `Admiralty_${weekName}_Chart_Corrections.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      log("PDF download initiated.");
+    }
+
+    function printResultPdf() {
+      if (!generatedPdfBlobUrl) return;
+      const iframe = document.getElementById('printIframe');
+      iframe.src = generatedPdfBlobUrl;
+      iframe.onload = () => {
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        } catch (e) {
+          window.open(generatedPdfBlobUrl, '_blank');
+        }
+      };
+      log("Print dialog opened.");
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,1751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admiralty Notices to Mariners (NMs) - Nautical Publications Corrections Extractor</title>
+  
+  <!-- Local Libraries with CDN fallback -->
+  <script src="./lib/jszip.min.js"></script>
+  <script>
+    if (typeof JSZip === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"><\/script>');
+    }
+  </script>
+  
+  <script src="./lib/pdf.min.js"></script>
+  <script>
+    if (typeof pdfjsLib === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>');
+    }
+  </script>
+  
+  <script src="./lib/pdf-lib.min.js"></script>
+  <script>
+    if (typeof PDFLib === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"><\/script>');
+    }
+  </script>
+
+  <style>
+    /* GÜNDÜZ MODU (Navigator Light Windows Klasik) */
+    [data-theme="day"] {
+      --bg-color: #d4d0c8;
+      --card-bg: #ece9d8;
+      --card-border: #808080;
+      --text-main: #000000;
+      --text-muted: #333333;
+      --text-label: #000080;
+      --accent: #003399;
+      --accent-hover: #002266;
+      --success: #007a3d;
+      --danger: #aa0000;
+      --input-bg: #ffffff;
+      --input-border: #7f9db9;
+      --input-text: #000000;
+      --table-header: #dcd8ce;
+      --table-header-text: #000000;
+      --table-row-even: #f7f6f2;
+      --table-row-odd: #ffffff;
+      --book-line: #888888;
+      --highlight: #cce8ff;
+      --banner-bg: #dfdbcf;
+      --console-bg: #ffffff;
+      --console-text: #000000;
+      --console-border: 2px inset #7f9db9;
+      --btn-bg: #e1e1e1;
+      --btn-text: #000000;
+      --btn-border: #707070;
+      --btn-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #808080;
+      --modal-bg: #ece9d8;
+      --modal-border: #606060;
+    }
+
+    /* GECE MODU (Yüksek kontrastlı, net ayırt edilebilir antrasit/lacivert tonlar) */
+    [data-theme="night"] {
+      --bg-color: #0b0f19;
+      --card-bg: #151d2a;
+      --card-border: #2a3649;
+      --text-main: #ffffff;
+      --text-muted: #94a3b8;
+      --text-label: #38bdf8;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --success: #16a34a;
+      --danger: #ef4444;
+      --input-bg: #090d16;
+      --input-border: #334155;
+      --input-text: #ffffff;
+      --table-header: #1e293b;
+      --table-header-text: #f8fafc;
+      --table-row-even: #151d2a;
+      --table-row-odd: #0e1522;
+      --book-line: #334155;
+      --highlight: #3b82f633;
+      --banner-bg: #0e1522;
+      --console-bg: #070a10;
+      --console-text: #38bdf8;
+      --console-border: 1px solid #2a3649;
+      --btn-bg: #2563eb;
+      --btn-text: #ffffff;
+      --btn-border: #1d4ed8;
+      --btn-shadow: none;
+      --modal-bg: #151d2a;
+      --modal-border: #3b82f6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    html, body {
+      width: 100%;
+      max-width: 100vw;
+      overflow-x: hidden;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 8px 12px;
+      font-size: 12px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ÜST BAŞLIK */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-icon {
+      font-size: 22px;
+    }
+
+    .brand h1 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--accent);
+    }
+
+    .brand span {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: block;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .theme-toggle-btn {
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      border: 1px solid var(--btn-border);
+      box-shadow: var(--btn-shadow);
+      padding: 5px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11.5px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle-btn:hover {
+      filter: brightness(1.1);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--card-border);
+      color: var(--success);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      background-color: var(--success);
+      border-radius: 50%;
+    }
+
+    /* MAIN CONTAINER */
+    .main-container {
+      flex: 1;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 420px minmax(0, 1fr);
+      gap: 10px;
+      align-items: stretch;
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 1024px) {
+      .main-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* KARTLAR */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 10px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-title {
+      font-size: 12.5px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-label);
+    }
+
+    .badge-count {
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-weight: 700;
+    }
+
+    /* FORM & BUTTONS */
+    input[type="text"], input[type="number"], select {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--input-text);
+      padding: 5px 8px;
+      border-radius: 3px;
+      font-size: 11.5px;
+      font-family: inherit;
+      outline: none;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent);
+    }
+
+    .btn {
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      border: 1px solid var(--btn-border);
+      box-shadow: var(--btn-shadow);
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      filter: brightness(1.1);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--btn-border);
+    }
+
+    .btn-secondary {
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      border: 1px solid var(--btn-border);
+    }
+
+    .btn-sm {
+      padding: 4px 8px;
+      font-size: 10.5px;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: #ffffff;
+      border: 1px solid var(--btn-border);
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: #ffffff;
+      border: 1px solid var(--btn-border);
+    }
+
+    /* PUBLICATION LIST */
+    .pub-list-container {
+      flex: 1;
+      min-height: 280px;
+      max-height: 480px;
+      overflow-y: auto;
+      border: 1px solid var(--card-border);
+      border-radius: 4px;
+      background: var(--input-bg);
+      padding: 6px;
+    }
+
+    .pub-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 4px;
+      margin-bottom: 5px;
+      transition: all 0.15s;
+      border-left: 3px solid var(--accent);
+    }
+
+    .pub-item.unchecked {
+      opacity: 0.55;
+      border-left-color: var(--card-border);
+    }
+
+    .pub-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      overflow: hidden;
+    }
+
+    .pub-info input[type="checkbox"] {
+      cursor: pointer;
+      width: 14px;
+      height: 14px;
+      accent-color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .pub-code {
+      font-weight: 700;
+      color: var(--accent);
+      min-width: 60px;
+      flex-shrink: 0;
+    }
+
+    .pub-title-text {
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 220px;
+      font-weight: 500;
+    }
+
+    .pub-item-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .status-tag {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 700;
+    }
+    .status-tag.found {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+    .status-tag.not-found {
+      background: rgba(148, 163, 184, 0.15);
+      color: var(--text-muted);
+      border: 1px solid var(--card-border);
+    }
+
+    .btn-delete-item {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 4px;
+      line-height: 1;
+    }
+    .btn-delete-item:hover {
+      color: var(--danger);
+    }
+
+    /* DROPZONE */
+    .dropzone {
+      border: 2px dashed var(--card-border);
+      border-radius: 6px;
+      padding: 24px 16px;
+      text-align: center;
+      background: var(--banner-bg);
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 10px;
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--accent);
+      background: var(--highlight);
+    }
+
+    .dropzone-icon {
+      font-size: 32px;
+      margin-bottom: 6px;
+      color: var(--accent);
+    }
+
+    .dropzone-text {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 4px;
+    }
+
+    .dropzone-subtext {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .dropzone-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* OPTIONS */
+    .options-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+      background: var(--banner-bg);
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+    }
+
+    .option-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+      color: var(--text-main);
+      cursor: pointer;
+    }
+
+    .option-item input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    /* PROGRESS & LOGS */
+    .progress-bar-container {
+      background: var(--input-bg);
+      border-radius: 4px;
+      height: 10px;
+      overflow: hidden;
+      margin: 8px 0 4px 0;
+      border: 1px solid var(--card-border);
+      display: none;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.15s ease;
+    }
+
+    .progress-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: right;
+      display: none;
+      margin-bottom: 6px;
+    }
+
+    .log-box {
+      background: var(--console-bg);
+      border: var(--console-border);
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 11.5px;
+      line-height: 1.45;
+      height: 95px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      color: var(--console-text);
+      font-weight: bold;
+    }
+
+    .btn-run {
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 10px 18px;
+      border-radius: 5px;
+      border: 1px solid var(--btn-border);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      width: 100%;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-run:hover:not(:disabled) {
+      filter: brightness(1.1);
+    }
+    .btn-run:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* RESULTS */
+    .result-section {
+      display: none;
+      margin-top: 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--success);
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .result-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--success);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .result-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .summary-table-container {
+      overflow-x: auto;
+      margin-top: 8px;
+    }
+
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11.5px;
+    }
+
+    .summary-table th, .summary-table td {
+      padding: 6px 10px;
+      text-align: left;
+      border: 1px solid var(--card-border);
+    }
+
+    .summary-table th {
+      background: var(--table-header);
+      color: var(--table-header-text);
+      font-weight: 700;
+    }
+
+    .summary-table tr:nth-child(even) {
+      background: var(--table-row-even);
+    }
+    .summary-table tr:nth-child(odd) {
+      background: var(--table-row-odd);
+    }
+
+    /* FOOTER */
+    .app-footer {
+      margin-top: 10px;
+      padding: 8px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--card-border);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .app-footer a {
+      color: var(--accent);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      transition: opacity 0.15s ease;
+    }
+
+    .app-footer a:hover {
+      text-decoration: underline;
+      opacity: 0.85;
+    }
+
+    .app-footer svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
+    /* Hidden file inputs */
+    input[type="file"] {
+      display: none;
+    }
+  </style>
+</head>
+<body data-theme="night">
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">📚</div>
+      <div>
+        <h1>ADMIRALTY PUBLICATIONS CORRECTIONS EXTRACTOR</h1>
+        <span>Automated Amendments & Slip Extractor for Sailing Directions, Lights & Radio Signals</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="status-badge" id="offlineBadge">
+        <span class="pulse-dot"></span>
+        <span id="offlineStatusText">Offline Ready</span>
+      </div>
+
+      <!-- TEMA BUTONU -->
+      <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()">
+        ☀️ Day Mode
+      </button>
+    </div>
+  </header>
+
+  <div class="main-container">
+    
+    <!-- LEFT PANEL: Ship's Publications Inventory Management -->
+    <div class="card">
+      <div class="card-title">
+        <span>📖 Ship's Publications Inventory</span>
+        <span class="badge-count" id="pubCountBadge">0 Active</span>
+      </div>
+
+      <!-- Add Custom Publication -->
+      <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+        <input type="text" id="newPubCode" placeholder="Code (e.g. NP46, Vol E, NP286(6))..." style="flex: 1;" onkeypress="if(event.key==='Enter') addCustomPub()">
+        <input type="text" id="newPubTitle" placeholder="Title / Description..." style="flex: 1.5;" onkeypress="if(event.key==='Enter') addCustomPub()">
+        <button class="btn btn-primary" onclick="addCustomPub()">Add</button>
+      </div>
+
+      <!-- Search & Bulk Actions -->
+      <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+        <input type="text" id="pubSearchInput" placeholder="Filter publications..." style="flex: 1;" oninput="renderPubList()">
+        <button class="btn btn-secondary btn-sm" onclick="toggleSelectAll(true)" title="Select all">☑️ All</button>
+        <button class="btn btn-secondary btn-sm" onclick="toggleSelectAll(false)" title="Deselect all">⬜ None</button>
+        <button class="btn btn-danger btn-sm" onclick="clearInventory()" title="Clear inventory">🗑️ Clear</button>
+      </div>
+
+      <!-- Export / Import -->
+      <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+        <button class="btn btn-secondary btn-sm" style="flex: 1;" onclick="exportInventory()">💾 Export</button>
+        <button class="btn btn-secondary btn-sm" style="flex: 1;" onclick="document.getElementById('importFileInput').click()">📂 Import</button>
+        <input type="file" id="importFileInput" accept=".json,.txt,.csv" style="display:none;" onchange="importInventory(event)">
+      </div>
+
+      <!-- Publication List Container -->
+      <div class="pub-list-container" id="pubListContainer">
+        <!-- Dynamically rendered publication items -->
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: File Upload, Options and Processing -->
+    <div class="card">
+      <div class="card-title">
+        <span>📦 Weekly NMs File & Extraction</span>
+        <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);" id="loadedFileInfo">
+          No file loaded yet
+        </span>
+      </div>
+
+      <!-- Drag & Drop Zone -->
+      <div class="dropzone" id="dropzone" onclick="triggerDefaultUpload()">
+        <div class="dropzone-icon">📁</div>
+        <div class="dropzone-text" id="dropzoneMainText">Drop Weekly NM ZIP File, Folder, or PWKLY / WKNM PDF Here</div>
+        <div class="dropzone-subtext">Automatically detects Section IV, V, VI and any publication paste-in slip PDFs</div>
+        
+        <div class="dropzone-buttons" onclick="event.stopPropagation()">
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('zipFileInput').click()">
+            📦 ZIP File (.zip)
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('folderInput').click()">
+            📂 Select Folder
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('pdfFileInput').click()">
+            📄 PDF File (.pdf)
+          </button>
+        </div>
+      </div>
+
+      <!-- Hidden file inputs -->
+      <input type="file" id="zipFileInput" accept=".zip" onchange="handleZipSelected(event)">
+      <input type="file" id="folderInput" webkitdirectory directory multiple onchange="handleFolderSelected(event)">
+      <input type="file" id="pdfFileInput" accept=".pdf" multiple onchange="handlePdfSelected(event)">
+
+      <!-- Extraction Options -->
+      <div class="options-grid">
+        <label class="option-item">
+          <input type="checkbox" id="optSec4" checked>
+          <span>Section IV: Sailing Directions (Pilots)</span>
+        </label>
+        <label class="option-item">
+          <input type="checkbox" id="optSec5" checked>
+          <span>Section V: List of Lights & Fog Signals</span>
+        </label>
+        <label class="option-item">
+          <input type="checkbox" id="optSec6" checked>
+          <span>Section VI: List of Radio Signals (ALRS)</span>
+        </label>
+        <label class="option-item">
+          <input type="checkbox" id="optSlips" checked>
+          <span>Append Paste-in Slips & Diagram PDFs</span>
+        </label>
+        <label class="option-item">
+          <input type="checkbox" id="optSummaryPage" checked>
+          <span>📋 Publications Bridge Endorsement Checklist</span>
+        </label>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="progress-bar-container" id="progressBarContainer">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div class="progress-text" id="progressText">Ready</div>
+
+      <!-- Log Output Box -->
+      <div class="log-box" id="logBox">
+        [System] Ready. Please upload a weekly NM ZIP pack, folder or PDF file.
+      </div>
+
+      <!-- Start Extraction Button -->
+      <button class="btn btn-run" id="btnRun" onclick="startExtraction()" disabled>
+        🚀 Scan Publications & Generate Corrections PDF
+      </button>
+
+      <!-- Results & Download Section -->
+      <div class="result-section" id="resultSection">
+        <div class="result-header">
+          <div class="result-title">
+            <span>✅ Publications Corrections PDF Generated Successfully!</span>
+          </div>
+          <div class="result-actions">
+            <button class="btn btn-success btn-sm" onclick="downloadResultPdf()">
+              📥 Download PDF
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="printResultPdf()">
+              🖨️ Direct Print
+            </button>
+          </div>
+        </div>
+
+        <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;" id="resultStats">
+          <!-- Dynamic stats -->
+        </div>
+
+        <div class="summary-table-container">
+          <table class="summary-table" id="summaryTable">
+            <thead>
+              <tr>
+                <th>Publication</th>
+                <th>Status</th>
+                <th>Bulletin Pages</th>
+                <th>Slips Attached</th>
+              </tr>
+            </thead>
+            <tbody id="summaryTableBody">
+              <!-- Dynamically populated results -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Hidden Iframe for Direct Printing -->
+  <iframe id="printIframe" style="display:none;"></iframe>
+
+  <!-- FOOTER -->
+  <footer class="app-footer no-print">
+    <div>
+      <span>Admiralty Publications Corrections Extractor</span>
+    </div>
+    <div>
+      <a href="https://github.com/yigitalpsari" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+        <span>https://github.com/yigitalpsari</span>
+      </a>
+    </div>
+  </footer>
+
+  <script>
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = './lib/pdf.worker.min.js';
+    }
+
+    // TEMA YÖNETİMİ
+    function updateThemeButton(theme) {
+      const btn = document.getElementById("themeToggleBtn");
+      if (!btn) return;
+      if (theme === "night") {
+        btn.innerHTML = "☀️ Day Mode";
+        btn.title = "Switch to Day Mode (Classic Windows)";
+      } else {
+        btn.innerHTML = "🌙 Night Mode";
+        btn.title = "Switch to Night Mode (High Contrast Dark)";
+      }
+    }
+
+    function setTheme(theme) {
+      document.body.setAttribute("data-theme", theme);
+      localStorage.setItem("admiralty_theme", theme);
+      updateThemeButton(theme);
+    }
+
+    function toggleTheme() {
+      const current = document.body.getAttribute("data-theme") || "night";
+      const next = current === "night" ? "day" : "night";
+      setTheme(next);
+    }
+
+    // Application State (Starts completely empty)
+    let publications = [];
+    let loadedFiles = {
+      mainPdfBuffer: null,
+      mainPdfName: "",
+      slips: []
+    };
+    let generatedPdfBytes = null;
+    let generatedPdfBlobUrl = null;
+
+    // Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedTheme = localStorage.getItem("admiralty_theme") || "night";
+      setTheme(savedTheme);
+
+      loadInventoryFromStorage();
+      setupDragAndDrop();
+    });
+
+    function log(msg) {
+      const box = document.getElementById('logBox');
+      const time = new Date().toLocaleTimeString();
+      box.innerHTML += `[${time}] ${msg}\n`;
+      box.scrollTop = box.scrollHeight;
+    }
+
+    // Inventory Management (Starts EMPTY if no user data saved)
+    function loadInventoryFromStorage() {
+      const saved = localStorage.getItem('admiralty_publications_inventory_v1');
+      if (saved) {
+        try {
+          publications = JSON.parse(saved);
+        } catch (e) {
+          publications = [];
+        }
+      } else {
+        publications = [];
+      }
+      renderPubList();
+    }
+
+    function saveInventoryToStorage() {
+      localStorage.setItem('admiralty_publications_inventory_v1', JSON.stringify(publications));
+      renderPubList();
+    }
+
+    function togglePub(code) {
+      const item = publications.find(p => p.code === code);
+      if (item) {
+        item.checked = !item.checked;
+        saveInventoryToStorage();
+      }
+    }
+
+    function toggleSelectAll(selectVal) {
+      const search = (document.getElementById('pubSearchInput').value || '').trim().toUpperCase();
+      publications.forEach(item => {
+        if (!search || item.code.toUpperCase().includes(search) || item.title.toUpperCase().includes(search)) {
+          item.checked = selectVal;
+        }
+      });
+      saveInventoryToStorage();
+    }
+
+    function addCustomPub() {
+      const codeInput = document.getElementById('newPubCode');
+      const titleInput = document.getElementById('newPubTitle');
+      const code = codeInput.value.trim().toUpperCase();
+      const title = titleInput.value.trim() || code;
+
+      if (!code) return;
+      if (publications.some(p => p.code.toUpperCase() === code)) {
+        alert("Publication code already exists: " + code);
+        return;
+      }
+
+      publications.unshift({
+        code: code,
+        title: title,
+        checked: true
+      });
+
+      codeInput.value = "";
+      titleInput.value = "";
+      saveInventoryToStorage();
+      log(`Added publication ${code} (${title}) to inventory.`);
+    }
+
+    function removePub(code) {
+      publications = publications.filter(p => p.code !== code);
+      saveInventoryToStorage();
+      log(`Removed publication ${code} from inventory.`);
+    }
+
+    function clearInventory() {
+      if (publications.length === 0) return;
+      if (confirm("Are you sure you want to clear your entire publications inventory?")) {
+        publications = [];
+        saveInventoryToStorage();
+        log("Publications inventory cleared.");
+      }
+    }
+
+    function renderPubList() {
+      const container = document.getElementById('pubListContainer');
+      const search = (document.getElementById('pubSearchInput').value || '').trim().toUpperCase();
+      const filtered = publications.filter(item => !search || item.code.toUpperCase().includes(search) || item.title.toUpperCase().includes(search));
+      const activeCount = publications.filter(p => p.checked).length;
+      document.getElementById('pubCountBadge').textContent = `${activeCount} of ${publications.length} Active`;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 11.5px;">${publications.length === 0 ? 'No publications in inventory. Add publication code and title above or import a list.' : 'No matching publications found.'}</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(item => `
+        <div class="pub-item ${item.checked ? '' : 'unchecked'}">
+          <div class="pub-info">
+            <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="togglePub('${item.code}')">
+            <span class="pub-code">${item.code}</span>
+            <span class="pub-title-text" title="${item.title}">${item.title}</span>
+          </div>
+          <div class="pub-item-actions">
+            ${item.lastStatus ? `
+              <span class="status-tag ${item.lastStatus.found ? 'found' : 'not-found'}">
+                ${item.lastStatus.found ? 'Amended' : 'Nil'}
+              </span>
+            ` : ''}
+            <button class="btn-delete-item" onclick="removePub('${item.code}')" title="Delete">✕</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function exportInventory() {
+      if (publications.length === 0) {
+        alert("Inventory is empty!");
+        return;
+      }
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(publications, null, 2));
+      const dl = document.createElement('a');
+      dl.setAttribute("href", dataStr);
+      dl.setAttribute("download", `Ship_Publications_Inventory_${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(dl);
+      dl.click();
+      dl.remove();
+      log("Publications inventory exported.");
+    }
+
+    function importInventory(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const content = e.target.result;
+          let added = 0;
+
+          if (file.name.endsWith('.json')) {
+            const parsed = JSON.parse(content);
+            if (Array.isArray(parsed)) {
+              parsed.forEach(p => {
+                const code = (p.code || p.number || '').toString().trim().toUpperCase();
+                if (code && !publications.some(item => item.code.toUpperCase() === code)) {
+                  publications.push({
+                    code: code,
+                    title: p.title || code,
+                    checked: p.checked !== false
+                  });
+                  added++;
+                }
+              });
+            }
+          } else {
+            const lines = content.split(/[\r\n]+/);
+            lines.forEach(line => {
+              const parts = line.split(/[,;\t]+/);
+              const code = (parts[0] || '').trim().toUpperCase();
+              const title = (parts[1] || '').trim() || code;
+              if (code && !publications.some(item => item.code.toUpperCase() === code)) {
+                publications.push({
+                  code: code,
+                  title: title,
+                  checked: true
+                });
+                added++;
+              }
+            });
+          }
+
+          saveInventoryToStorage();
+          log(`Import completed. ${added} new publications added.`);
+          alert(`Successfully imported ${added} new publications!`);
+        } catch (err) {
+          alert("Import error: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = "";
+    }
+
+    // Drag & Drop Setup
+    function setupDragAndDrop() {
+      const dropzone = document.getElementById('dropzone');
+
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, preventDefaults, false);
+      });
+
+      function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, () => dropzone.classList.add('dragover'), false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, () => dropzone.classList.remove('dragover'), false);
+      });
+
+      dropzone.addEventListener('drop', handleDrop, false);
+    }
+
+    function triggerDefaultUpload() {
+      document.getElementById('zipFileInput').click();
+    }
+
+    function handleDrop(e) {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (!files || files.length === 0) return;
+
+      if (files.length === 1 && files[0].name.toLowerCase().endsWith('.zip')) {
+        processZip(files[0]);
+      } else if (files.length === 1 && files[0].name.toLowerCase().endsWith('.pdf')) {
+        processPdf(files[0]);
+      } else {
+        processMultipleFiles(Array.from(files));
+      }
+    }
+
+    function handleZipSelected(e) {
+      const file = e.target.files[0];
+      if (file) processZip(file);
+      e.target.value = "";
+    }
+
+    function handleFolderSelected(e) {
+      const files = Array.from(e.target.files);
+      if (files.length > 0) processMultipleFiles(files);
+      e.target.value = "";
+    }
+
+    function handlePdfSelected(e) {
+      const files = Array.from(e.target.files);
+      if (files.length === 1) {
+        processPdf(files[0]);
+      } else if (files.length > 1) {
+        processMultipleFiles(files);
+      }
+      e.target.value = "";
+    }
+
+    // File Parsers
+    async function processZip(zipFile) {
+      log(`Opening ZIP file: ${zipFile.name}...`);
+      loadedFiles = { mainPdfBuffer: null, mainPdfName: "", slips: [] };
+      document.getElementById('loadedFileInfo').textContent = `Loaded: ${zipFile.name}`;
+
+      try {
+        const zip = await JSZip.loadAsync(zipFile);
+        const pdfFiles = [];
+
+        zip.forEach((relPath, entry) => {
+          if (!entry.dir && relPath.toLowerCase().endsWith('.pdf')) {
+            pdfFiles.push(entry);
+          }
+        });
+
+        log(`ZIP contains ${pdfFiles.length} PDF files.`);
+
+        let mainEntry = pdfFiles.find(e => /pwkly.*\.pdf$/i.test(e.name));
+        if (!mainEntry) {
+          mainEntry = pdfFiles.find(e => /wknm\d+\.pdf$/i.test(e.name) || /wknm.*\.pdf$/i.test(e.name));
+        }
+        if (!mainEntry && pdfFiles.length > 0) {
+          mainEntry = pdfFiles[0];
+        }
+
+        if (mainEntry) {
+          log(`Identified main publications bulletin: ${mainEntry.name}`);
+          loadedFiles.mainPdfName = mainEntry.name;
+          loadedFiles.mainPdfBuffer = await mainEntry.async("arraybuffer");
+        } else {
+          throw new Error("No Admiralty Publications Bulletin (PWKLY or WKNM) PDF found in ZIP!");
+        }
+
+        for (const entry of pdfFiles) {
+          if (entry === mainEntry) continue;
+          if (/^NP\d+/i.test(entry.name) || /_slip/i.test(entry.name)) {
+            const buf = await entry.async("arraybuffer");
+            loadedFiles.slips.push({ name: entry.name, buffer: buf });
+          }
+        }
+        log(`Loaded ${loadedFiles.slips.length} publication paste-in slips/supplements from ZIP.`);
+
+        document.getElementById('dropzoneMainText').textContent = `Ready: ${zipFile.name}`;
+        document.getElementById('btnRun').disabled = false;
+        log("Ready. Click the scan button below to proceed.");
+
+      } catch (err) {
+        alert("Error reading ZIP file: " + err.message);
+        log("ERROR: " + err.message);
+      }
+    }
+
+    async function processMultipleFiles(fileList) {
+      log(`Analyzing ${fileList.length} files...`);
+      loadedFiles = { mainPdfBuffer: null, mainPdfName: "", slips: [] };
+
+      const pdfFiles = fileList.filter(f => f.name.toLowerCase().endsWith('.pdf'));
+      if (pdfFiles.length === 0) {
+        alert("No PDF files found in selection!");
+        return;
+      }
+
+      let mainFile = pdfFiles.find(f => /pwkly.*\.pdf$/i.test(f.name));
+      if (!mainFile) {
+        mainFile = pdfFiles.find(f => /wknm\d+\.pdf$/i.test(f.name) || /wknm.*\.pdf$/i.test(f.name));
+      }
+      if (!mainFile) {
+        mainFile = pdfFiles[0];
+      }
+
+      log(`Main bulletin selected: ${mainFile.name}`);
+      loadedFiles.mainPdfName = mainFile.name;
+      loadedFiles.mainPdfBuffer = await mainFile.arrayBuffer();
+      document.getElementById('loadedFileInfo').textContent = `Loaded: ${mainFile.name}`;
+
+      for (const f of pdfFiles) {
+        if (f === mainFile) continue;
+        if (/^NP\d+/i.test(f.name) || /_slip/i.test(f.name)) {
+          const buf = await f.arrayBuffer();
+          loadedFiles.slips.push({ name: f.name, buffer: buf });
+        }
+      }
+      log(`Loaded ${loadedFiles.slips.length} publication paste-in slips/supplements.`);
+
+      document.getElementById('dropzoneMainText').textContent = `Ready: ${mainFile.name}`;
+      document.getElementById('btnRun').disabled = false;
+      log("Ready. Click the scan button below to proceed.");
+    }
+
+    async function processPdf(file) {
+      log(`Opening PDF: ${file.name}...`);
+      loadedFiles = { mainPdfBuffer: null, mainPdfName: "", slips: [] };
+      document.getElementById('loadedFileInfo').textContent = `Loaded: ${file.name}`;
+
+      try {
+        loadedFiles.mainPdfName = file.name;
+        loadedFiles.mainPdfBuffer = await file.arrayBuffer();
+        document.getElementById('dropzoneMainText').textContent = `Ready: ${file.name}`;
+        document.getElementById('btnRun').disabled = false;
+        log("PDF loaded successfully. Click the scan button below to proceed.");
+      } catch (err) {
+        alert("Error loading PDF: " + err.message);
+        log("ERROR: " + err.message);
+      }
+    }
+
+    // Intelligent Multi-Section Matching Algorithm
+    function matchPublicationInText(pub, pageText, currentSection) {
+      if (!pageText) return false;
+      const code = pub.code.toUpperCase();
+      const title = (pub.title || '').toUpperCase();
+
+      // Section IV: Sailing Directions (Pilots)
+      if (currentSection === "SEC_IV") {
+        const npMatch = code.match(/NP\s*(\d+)/i);
+        if (npMatch) {
+          const npNum = npMatch[1];
+          const pattern1 = new RegExp(`\\bNP\\s*0*${npNum}\\b`, 'i');
+          if (pattern1.test(pageText)) return true;
+        }
+        if (title) {
+          const cleanTitle = title.replace(/\s*VOL(?:UME)?\s*\d+/i, '').trim();
+          if (cleanTitle.length > 5 && pageText.toUpperCase().includes(cleanTitle)) {
+            return true;
+          }
+        }
+      }
+
+      // Section V: List of Lights & Fog Signals
+      if (currentSection === "SEC_V") {
+        const volMatch = code.match(/VOL(?:UME)?\.?\s*([A-Q])/i) || title.match(/VOL(?:UME)?\.?\s*([A-Q])/i);
+        if (volMatch) {
+          const letter = volMatch[1];
+          const letPatt = new RegExp(`\\b(?:Volume|Vol\\.?)\\s*${letter}\\b`, 'i');
+          if (letPatt.test(pageText)) return true;
+        }
+        const npMatch = code.match(/NP\s*(7[4-9]|8[0-8])\b/i) || title.match(/NP\s*(7[4-9]|8[0-8])\b/i);
+        if (npMatch) {
+          const npPatt = new RegExp(`\\bNP\\s*0*${npMatch[1]}\\b`, 'i');
+          if (npPatt.test(pageText)) return true;
+        }
+      }
+
+      // Section VI: List of Radio Signals (ALRS)
+      if (currentSection === "SEC_VI") {
+        const cleanCode = code.replace(/\s+/g, '');
+        const escCode = cleanCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = new RegExp(escCode, 'i');
+        const noSpaceText = pageText.replace(/\s+/g, '');
+        if (pattern.test(noSpaceText)) return true;
+
+        const subMatch = code.match(/NP\s*(28\d)\s*(?:\((\d+)\))?/i);
+        if (subMatch) {
+          const baseNum = subMatch[1];
+          const partNum = subMatch[2];
+          if (partNum) {
+            const rxPart = new RegExp(`NP\\s*0*${baseNum}\\s*\\(\\s*0*${partNum}\\s*\\)`, 'i');
+            if (rxPart.test(pageText)) return true;
+          } else {
+            const rxBase = new RegExp(`NP\\s*0*${baseNum}\\b`, 'i');
+            if (rxBase.test(pageText)) return true;
+          }
+        }
+      }
+
+      // General fallback matching
+      const npGeneral = code.match(/NP\s*(\d+)/i);
+      if (npGeneral) {
+        const pattern = new RegExp(`\\bNP\\s*0*${npGeneral[1]}\\b`, 'i');
+        if (pattern.test(pageText)) return true;
+      }
+
+      return false;
+    }
+
+    function matchSlipToPublication(pub, slipName) {
+      const code = pub.code.toUpperCase().replace(/\s+/g, '');
+      const sName = slipName.toUpperCase().replace(/\s+/g, '');
+
+      if (sName.includes(code)) return true;
+
+      const subMatch = code.match(/NP(\d+)(?:\((\d+)\))?/i);
+      if (subMatch) {
+        const base = subMatch[1];
+        const part = subMatch[2];
+        if (part && sName.includes(`NP${base}(${part})`)) return true;
+        if (!part && sName.includes(`NP${base}`)) return true;
+      }
+      return false;
+    }
+
+    // Extraction Engine
+    async function startExtraction() {
+      if (!loadedFiles.mainPdfBuffer) {
+        alert("Please load a weekly NM ZIP pack or PDF file first!");
+        return;
+      }
+
+      const activePubs = publications.filter(p => p.checked);
+      if (activePubs.length === 0) {
+        alert("Please add and check at least one publication in your inventory to scan!");
+        return;
+      }
+
+      const optSec4 = document.getElementById('optSec4').checked;
+      const optSec5 = document.getElementById('optSec5').checked;
+      const optSec6 = document.getElementById('optSec6').checked;
+      const optSlips = document.getElementById('optSlips').checked;
+      const optSummaryPage = document.getElementById('optSummaryPage').checked;
+
+      const btnRun = document.getElementById('btnRun');
+      btnRun.disabled = true;
+      btnRun.textContent = "⏳ Scanning Publications & Assembling PDF...";
+
+      const progContainer = document.getElementById('progressBarContainer');
+      const progressBar = document.getElementById('progressBar');
+      const progText = document.getElementById('progressText');
+      progContainer.style.display = 'block';
+      progText.style.display = 'block';
+
+      log("=== Publications Scan Process Started ===");
+
+      try {
+        const pdfJsData = new Uint8Array(loadedFiles.mainPdfBuffer.slice(0));
+        const pdfDoc = await pdfjsLib.getDocument({ data: pdfJsData }).promise;
+        const totalPages = pdfDoc.numPages;
+        log(`Loaded ${totalPages} pages. Scanning for ${activePubs.length} active publications...`);
+
+        const pagesToInclude = new Set();
+        const pubResults = {};
+        activePubs.forEach(p => {
+          pubResults[p.code] = {
+            found: false,
+            pages: [],
+            slips: []
+          };
+        });
+
+        let currentSection = "UNKNOWN";
+
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+          const percent = Math.round((pageNum / totalPages) * 100);
+          progressBar.style.width = percent + '%';
+          progText.textContent = `Scanning page ${pageNum} of ${totalPages} (${percent}%)`;
+
+          const page = await pdfDoc.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map(item => item.str).join(' ');
+
+          if (/SECTION\s+IV/i.test(pageText) || /AMENDMENTS\s+TO\s+ADMIRALTY\s+SAILING\s+DIRECTIONS/i.test(pageText) || /UPDATES\s+TO\s+ADMIRALTY\s+SAILING\s+DIRECTIONS/i.test(pageText)) {
+            currentSection = "SEC_IV";
+          } else if (/SECTION\s+V/i.test(pageText) || /AMENDMENTS\s+TO\s+ADMIRALTY\s+LISTS?\s+OF\s+LIGHTS/i.test(pageText)) {
+            currentSection = "SEC_V";
+          } else if (/SECTION\s+VI/i.test(pageText) || /AMENDMENTS\s+TO\s+ADMIRALTY\s+LIST\s+OF\s+RADIO\s+SIGNALS/i.test(pageText)) {
+            currentSection = "SEC_VI";
+          } else if (/SECTION\s+I\b/i.test(pageText) || /SECTION\s+II\b/i.test(pageText) || /SECTION\s+III\b/i.test(pageText)) {
+            currentSection = "OTHER_SECTION";
+          }
+
+          let sectionAllowed = false;
+          if (currentSection === "SEC_IV" && optSec4) sectionAllowed = true;
+          if (currentSection === "SEC_V" && optSec5) sectionAllowed = true;
+          if (currentSection === "SEC_VI" && optSec6) sectionAllowed = true;
+
+          if (sectionAllowed) {
+            for (const pub of activePubs) {
+              if (matchPublicationInText(pub, pageText, currentSection)) {
+                pubResults[pub.code].found = true;
+                if (!pubResults[pub.code].pages.includes(pageNum)) {
+                  pubResults[pub.code].pages.push(pageNum);
+                }
+                pagesToInclude.add(pageNum);
+                log(`-> Page ${pageNum} [${currentSection}]: Amendment found for ${pub.code}.`);
+              }
+            }
+          }
+        }
+
+        let attachedSlipsCount = 0;
+        const matchingSlipsToAppend = [];
+
+        if (optSlips && loadedFiles.slips.length > 0) {
+          for (const slip of loadedFiles.slips) {
+            for (const pub of activePubs) {
+              if (matchSlipToPublication(pub, slip.name)) {
+                pubResults[pub.code].found = true;
+                pubResults[pub.code].slips.push(slip.name);
+                matchingSlipsToAppend.push(slip);
+                attachedSlipsCount++;
+                log(`Paste-in slip '${slip.name}' matched with ${pub.code}.`);
+                break;
+              }
+            }
+          }
+        }
+
+        activePubs.forEach(p => {
+          const res = pubResults[p.code];
+          p.lastStatus = {
+            found: res.found,
+            text: res.found ? (res.pages.length > 0 ? `Pages ${res.pages.join(', ')}` : 'Slip Attached') : 'Nil'
+          };
+        });
+        saveInventoryToStorage();
+
+        progText.textContent = "Merging pages into publication corrections PDF...";
+        const pdfLibData = new Uint8Array(loadedFiles.mainPdfBuffer.slice(0));
+        const srcDoc = await PDFLib.PDFDocument.load(pdfLibData);
+        const outDoc = await PDFLib.PDFDocument.create();
+
+        const sortedPageNums = Array.from(pagesToInclude).sort((a, b) => a - b);
+        log(`Adding ${sortedPageNums.length} extracted publication pages into output PDF...`);
+
+        if (sortedPageNums.length > 0) {
+          const pageIndices = sortedPageNums.map(n => n - 1);
+          const copiedPages = await outDoc.copyPages(srcDoc, pageIndices);
+          copiedPages.forEach(p => outDoc.addPage(p));
+        }
+
+        if (optSlips && matchingSlipsToAppend.length > 0) {
+          for (const slip of matchingSlipsToAppend) {
+            try {
+              const slipData = new Uint8Array(slip.buffer.slice(0));
+              const slipDoc = await PDFLib.PDFDocument.load(slipData);
+              const slipPages = await outDoc.copyPages(slipDoc, slipDoc.getPageIndices());
+              slipPages.forEach(p => outDoc.addPage(p));
+              log(`Slip '${slip.name}' appended to PDF.`);
+            } catch (e) {
+              console.warn(`Could not attach slip ${slip.name}:`, e);
+            }
+          }
+        }
+
+        let addedSummaryPageCount = 0;
+        if (optSummaryPage) {
+          progText.textContent = "Generating bridge endorsement checklist page...";
+          let summaryPage = outDoc.addPage([595.28, 841.89]);
+          const fontBold = await outDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+          const fontRegular = await outDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+
+          const width = summaryPage.getWidth();
+          const height = summaryPage.getHeight();
+
+          summaryPage.drawText("WEEKLY NAUTICAL PUBLICATIONS AMENDMENTS & BRIDGE ENDORSEMENT LIST", {
+            x: 40,
+            y: height - 50,
+            size: 13,
+            font: fontBold,
+            color: PDFLib.rgb(0, 0, 0)
+          });
+
+          const todayStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+          const bulletinName = loadedFiles.mainPdfName.replace('.pdf', '');
+          summaryPage.drawText(`Bulletin: ${bulletinName}    |    Date: ${todayStr}    |    SOLAS Chapter V Compliance`, {
+            x: 40,
+            y: height - 68,
+            size: 9.5,
+            font: fontRegular,
+            color: PDFLib.rgb(0, 0, 0)
+          });
+
+          summaryPage.drawLine({
+            start: { x: 40, y: height - 76 },
+            end: { x: width - 40, y: height - 76 },
+            thickness: 1,
+            color: PDFLib.rgb(0, 0, 0)
+          });
+
+          let y = height - 98;
+          summaryPage.drawLine({ start: { x: 40, y: y + 8 }, end: { x: width - 40, y: y + 8 }, thickness: 1, color: PDFLib.rgb(0, 0, 0) });
+          summaryPage.drawLine({ start: { x: 40, y: y - 14 }, end: { x: width - 40, y: y - 14 }, thickness: 1, color: PDFLib.rgb(0, 0, 0) });
+
+          summaryPage.drawText("[   ]", { x: 50, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+          summaryPage.drawText("PUBLICATION", { x: 95, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+          summaryPage.drawText("TITLE / DESCRIPTION", { x: 210, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+          summaryPage.drawText("BULLETIN PAGES", { x: 440, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+
+          y -= 24;
+
+          const amendedPubs = activePubs.filter(p => pubResults[p.code].found);
+          const nilPubs = activePubs.filter(p => !pubResults[p.code].found);
+
+          if (amendedPubs.length === 0) {
+            summaryPage.drawText("No amendments found in this weekly bulletin for your active publications inventory.", {
+              x: 40,
+              y: y - 10,
+              size: 10,
+              font: fontRegular,
+              color: PDFLib.rgb(0, 0, 0)
+            });
+            y -= 30;
+          } else {
+            for (let i = 0; i < amendedPubs.length; i++) {
+              if (y < 60) {
+                summaryPage = outDoc.addPage([595.28, 841.89]);
+                y = height - 50;
+                addedSummaryPageCount++;
+                summaryPage.drawLine({ start: { x: 40, y: y + 8 }, end: { x: width - 40, y: y + 8 }, thickness: 1, color: PDFLib.rgb(0, 0, 0) });
+                summaryPage.drawLine({ start: { x: 40, y: y - 14 }, end: { x: width - 40, y: y - 14 }, thickness: 1, color: PDFLib.rgb(0, 0, 0) });
+                summaryPage.drawText("[   ]", { x: 50, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+                summaryPage.drawText("PUBLICATION", { x: 95, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+                summaryPage.drawText("TITLE / DESCRIPTION", { x: 210, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+                summaryPage.drawText("BULLETIN PAGES", { x: 440, y: y - 8, size: 9, font: fontBold, color: PDFLib.rgb(0, 0, 0) });
+                y -= 24;
+              }
+              const p = amendedPubs[i];
+              const res = pubResults[p.code];
+
+              summaryPage.drawRectangle({
+                x: 52,
+                y: y - 11,
+                width: 12,
+                height: 12,
+                borderColor: PDFLib.rgb(0, 0, 0),
+                borderWidth: 1
+              });
+
+              summaryPage.drawText(p.code, {
+                x: 95,
+                y: y - 9,
+                size: 9.5,
+                font: fontBold,
+                color: PDFLib.rgb(0, 0, 0)
+              });
+
+              summaryPage.drawText(p.title.slice(0, 36), {
+                x: 210,
+                y: y - 9,
+                size: 9,
+                font: fontRegular,
+                color: PDFLib.rgb(0, 0, 0)
+              });
+
+              let pageInfo = res.pages.length > 0 ? `Pages ${res.pages.join(', ')}` : '';
+              if (res.slips.length > 0) {
+                pageInfo += (pageInfo ? ' + ' : '') + `Slip (${res.slips.length})`;
+              }
+              summaryPage.drawText(pageInfo || 'Amended', {
+                x: 440,
+                y: y - 9,
+                size: 9,
+                font: fontRegular,
+                color: PDFLib.rgb(0, 0, 0)
+              });
+
+              summaryPage.drawLine({
+                start: { x: 40, y: y - 16 },
+                end: { x: width - 40, y: y - 16 },
+                thickness: 0.5,
+                color: PDFLib.rgb(0.7, 0.7, 0.7)
+              });
+
+              y -= 22;
+            }
+          }
+
+          if (nilPubs.length > 0) {
+            if (y < 80) {
+              summaryPage = outDoc.addPage([595.28, 841.89]);
+              y = height - 50;
+              addedSummaryPageCount++;
+            }
+            y -= 16;
+            summaryPage.drawText(`PUBLICATIONS WITH NO AMENDMENTS THIS WEEK (NIL - ${nilPubs.length} PUBLICATIONS):`, {
+              x: 40,
+              y: y,
+              size: 9,
+              font: fontBold,
+              color: PDFLib.rgb(0, 0, 0)
+            });
+            y -= 14;
+
+            const nilCodes = nilPubs.map(p => p.code);
+            let currentLine = "";
+            const lines = [];
+            for (let i = 0; i < nilCodes.length; i++) {
+              const code = nilCodes[i];
+              const testLine = currentLine ? `${currentLine}, ${code}` : code;
+              if (testLine.length > 85) {
+                lines.push(currentLine + ",");
+                currentLine = code;
+              } else {
+                currentLine = testLine;
+              }
+            }
+            if (currentLine) lines.push(currentLine);
+
+            for (const line of lines) {
+              if (y < 45) {
+                summaryPage = outDoc.addPage([595.28, 841.89]);
+                y = height - 50;
+                addedSummaryPageCount++;
+              }
+              summaryPage.drawText(line, {
+                x: 40,
+                y: y,
+                size: 8.5,
+                font: fontRegular,
+                color: PDFLib.rgb(0.2, 0.2, 0.2)
+              });
+              y -= 12;
+            }
+          }
+
+          if (y < 70) {
+            summaryPage = outDoc.addPage([595.28, 841.89]);
+            y = height - 50;
+            addedSummaryPageCount++;
+          }
+          y -= 20;
+          summaryPage.drawLine({
+            start: { x: 40, y: y },
+            end: { x: width - 40, y: y },
+            thickness: 1,
+            color: PDFLib.rgb(0, 0, 0)
+          });
+          y -= 16;
+          summaryPage.drawText("Applied & Endorsed in Publications by Navigating Officer: __________________________   Signature: ________________   Date: ____________", {
+            x: 40,
+            y: y,
+            size: 8.5,
+            font: fontRegular,
+            color: PDFLib.rgb(0, 0, 0)
+          });
+
+          addedSummaryPageCount++;
+          log("Bridge endorsement checklist page appended to PDF.");
+        }
+
+        generatedPdfBytes = await outDoc.save();
+        const blob = new Blob([generatedPdfBytes], { type: 'application/pdf' });
+        if (generatedPdfBlobUrl) URL.revokeObjectURL(generatedPdfBlobUrl);
+        generatedPdfBlobUrl = URL.createObjectURL(blob);
+
+        log(`=== PROCESS COMPLETED ===`);
+        log(`Original: ${totalPages} pages -> Extracted PDF: ${sortedPageNums.length + matchingSlipsToAppend.length + addedSummaryPageCount} pages.`);
+
+        renderResults(sortedPageNums, totalPages, pubResults, matchingSlipsToAppend.length, addedSummaryPageCount);
+
+      } catch (err) {
+        alert("Extraction error: " + err.message);
+        log("ERROR: " + err.message);
+        console.error(err);
+      } finally {
+        btnRun.disabled = false;
+        btnRun.textContent = "🚀 Scan Publications & Generate Corrections PDF";
+      }
+    }
+
+    function renderResults(sortedPages, origTotal, pubResults, slipsCount, summaryPageCount = 0) {
+      const section = document.getElementById('resultSection');
+      section.style.display = 'block';
+
+      const foundCount = Object.values(pubResults).filter(r => r.found).length;
+      const totalChecked = Object.keys(pubResults).length;
+      const finalPageCount = sortedPages.length + slipsCount + summaryPageCount;
+
+      document.getElementById('resultStats').innerHTML = `
+        <strong>Summary:</strong> Found amendments for <strong>${foundCount} of ${totalChecked}</strong> active publications.
+        Extracted <strong>${finalPageCount} total pages</strong> (${sortedPages.length} bulletin pages, ${slipsCount} paste-in slips, ${summaryPageCount} checklist page).
+      `;
+
+      const tbody = document.getElementById('summaryTableBody');
+      const activePubs = publications.filter(p => p.checked);
+
+      tbody.innerHTML = activePubs.map(p => {
+        const res = pubResults[p.code];
+        return `
+          <tr>
+            <td><strong>${p.code}</strong> <span style="font-size: 11px; color: var(--text-muted); display: block;">${p.title}</span></td>
+            <td>
+              <span class="status-tag ${res.found ? 'found' : 'not-found'}">
+                ${res.found ? '✅ Amended' : '⚪ Nil'}
+              </span>
+            </td>
+            <td>${res.pages.length > 0 ? res.pages.join(', ') : '-'}</td>
+            <td>${res.slips.length > 0 ? `📄 ${res.slips.join(', ')}` : '-'}</td>
+          </tr>
+        `;
+      }).join('');
+
+      section.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Download & Print
+    function downloadResultPdf() {
+      if (!generatedPdfBlobUrl) return;
+      const a = document.createElement('a');
+      a.href = generatedPdfBlobUrl;
+      const weekName = loadedFiles.mainPdfName.replace('.pdf', '') || 'Weekly';
+      a.download = `Admiralty_${weekName}_Publications_Corrections.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      log("PDF download initiated.");
+    }
+
+    function printResultPdf() {
+      if (!generatedPdfBlobUrl) return;
+      const iframe = document.getElementById('printIframe');
+      iframe.src = generatedPdfBlobUrl;
+      iframe.onload = () => {
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        } catch (e) {
+          window.open(generatedPdfBlobUrl, '_blank');
+        }
+      };
+      log("Print dialog opened.");
+    }
+  </script>
+</body>
+</html>
