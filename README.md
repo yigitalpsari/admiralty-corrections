@@ -87,7 +87,7 @@ No web server, Python, or Node.js runtime required!
 
 ---
 
-### 👨‍💻 Developer
+### 👨‍💻 Author
 - **Yiğit Alp Sarı** - [GitHub Profile](https://github.com/yigitalpsari)
 
 ---

@@ -1171,27 +1171,31 @@
 
         log(`ZIP contains ${pdfFiles.length} PDF files.`);
 
-        let mainEntry = pdfFiles.find(e => /pwkly.*\.pdf$/i.test(e.name));
+        const getBaseName = (p) => (p || '').split('/').pop().split('\\').pop();
+
+        let mainEntry = pdfFiles.find(e => /wknm.*\.pdf$/i.test(getBaseName(e.name)));
         if (!mainEntry) {
-          mainEntry = pdfFiles.find(e => /wknm\d+\.pdf$/i.test(e.name) || /wknm.*\.pdf$/i.test(e.name));
+          mainEntry = pdfFiles.find(e => /pwkly.*\.pdf$/i.test(getBaseName(e.name)));
         }
         if (!mainEntry && pdfFiles.length > 0) {
           mainEntry = pdfFiles[0];
         }
 
         if (mainEntry) {
-          log(`Identified main publications bulletin: ${mainEntry.name}`);
-          loadedFiles.mainPdfName = mainEntry.name;
+          const mainBase = getBaseName(mainEntry.name);
+          log(`Identified main publications bulletin: ${mainBase}`);
+          loadedFiles.mainPdfName = mainBase;
           loadedFiles.mainPdfBuffer = await mainEntry.async("arraybuffer");
         } else {
-          throw new Error("No Admiralty Publications Bulletin (PWKLY or WKNM) PDF found in ZIP!");
+          throw new Error("No Admiralty Publications Bulletin (WKNM or PWKLY) PDF found in ZIP!");
         }
 
         for (const entry of pdfFiles) {
           if (entry === mainEntry) continue;
-          if (/^NP\d+/i.test(entry.name) || /_slip/i.test(entry.name)) {
+          const baseName = getBaseName(entry.name);
+          if (/^NP\d+/i.test(baseName) || /_slip/i.test(baseName) || /slip/i.test(baseName)) {
             const buf = await entry.async("arraybuffer");
-            loadedFiles.slips.push({ name: entry.name, buffer: buf });
+            loadedFiles.slips.push({ name: baseName, buffer: buf });
           }
         }
         log(`Loaded ${loadedFiles.slips.length} publication paste-in slips/supplements from ZIP.`);
@@ -1216,24 +1220,28 @@
         return;
       }
 
-      let mainFile = pdfFiles.find(f => /pwkly.*\.pdf$/i.test(f.name));
+      const getBaseName = (p) => (p || '').split('/').pop().split('\\').pop();
+
+      let mainFile = pdfFiles.find(f => /wknm.*\.pdf$/i.test(getBaseName(f.name)));
       if (!mainFile) {
-        mainFile = pdfFiles.find(f => /wknm\d+\.pdf$/i.test(f.name) || /wknm.*\.pdf$/i.test(f.name));
+        mainFile = pdfFiles.find(f => /pwkly.*\.pdf$/i.test(getBaseName(f.name)));
       }
       if (!mainFile) {
         mainFile = pdfFiles[0];
       }
 
-      log(`Main bulletin selected: ${mainFile.name}`);
-      loadedFiles.mainPdfName = mainFile.name;
+      const mainBase = getBaseName(mainFile.name);
+      log(`Main bulletin selected: ${mainBase}`);
+      loadedFiles.mainPdfName = mainBase;
       loadedFiles.mainPdfBuffer = await mainFile.arrayBuffer();
-      document.getElementById('loadedFileInfo').textContent = `Loaded: ${mainFile.name}`;
+      document.getElementById('loadedFileInfo').textContent = `Loaded: ${mainBase}`;
 
       for (const f of pdfFiles) {
         if (f === mainFile) continue;
-        if (/^NP\d+/i.test(f.name) || /_slip/i.test(f.name)) {
+        const bName = getBaseName(f.name);
+        if (/^NP\d+/i.test(bName) || /_slip/i.test(bName) || /slip/i.test(bName)) {
           const buf = await f.arrayBuffer();
-          loadedFiles.slips.push({ name: f.name, buffer: buf });
+          loadedFiles.slips.push({ name: bName, buffer: buf });
         }
       }
       log(`Loaded ${loadedFiles.slips.length} publication paste-in slips/supplements.`);
@@ -1263,8 +1271,8 @@
     // Intelligent Multi-Section Matching Algorithm
     function matchPublicationInText(pub, pageText, currentSection) {
       if (!pageText) return false;
-      const code = pub.code.toUpperCase();
-      const title = (pub.title || '').toUpperCase();
+      const code = pub.code.toUpperCase().trim();
+      const title = (pub.title || '').toUpperCase().trim();
 
       // Section IV: Sailing Directions (Pilots)
       if (currentSection === "SEC_IV") {
@@ -1280,6 +1288,7 @@
             return true;
           }
         }
+        return false;
       }
 
       // Section V: List of Lights & Fog Signals
@@ -1295,31 +1304,35 @@
           const npPatt = new RegExp(`\\bNP\\s*0*${npMatch[1]}\\b`, 'i');
           if (npPatt.test(pageText)) return true;
         }
+        return false;
       }
 
       // Section VI: List of Radio Signals (ALRS)
       if (currentSection === "SEC_VI") {
+        const subMatch = code.match(/NP\s*(28\d)\s*(?:\(\s*(\d+)\s*\))?/i);
+        if (subMatch) {
+          const baseNum = subMatch[1];
+          const partNum = subMatch[2];
+          if (partNum) {
+            const rxPart = new RegExp(`NP\\s*0*${baseNum}\\s*\\(\\s*0*${partNum}\\s*\\)`, 'i');
+            const rxVolPart = new RegExp(`\\b(?:Volume|Vol\\.?)\\s*0*${baseNum.slice(-1)}\\s*,?\\s*(?:Part|Pt\\.?)\\s*0*${partNum}\\b`, 'i');
+            if (rxPart.test(pageText) || rxVolPart.test(pageText)) return true;
+          } else {
+            const rxBase = new RegExp(`\\bNP\\s*0*${baseNum}\\b`, 'i');
+            if (rxBase.test(pageText)) return true;
+          }
+        }
+
         const cleanCode = code.replace(/\s+/g, '');
         const escCode = cleanCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const pattern = new RegExp(escCode, 'i');
         const noSpaceText = pageText.replace(/\s+/g, '');
         if (pattern.test(noSpaceText)) return true;
 
-        const subMatch = code.match(/NP\s*(28\d)\s*(?:\((\d+)\))?/i);
-        if (subMatch) {
-          const baseNum = subMatch[1];
-          const partNum = subMatch[2];
-          if (partNum) {
-            const rxPart = new RegExp(`NP\\s*0*${baseNum}\\s*\\(\\s*0*${partNum}\\s*\\)`, 'i');
-            if (rxPart.test(pageText)) return true;
-          } else {
-            const rxBase = new RegExp(`NP\\s*0*${baseNum}\\b`, 'i');
-            if (rxBase.test(pageText)) return true;
-          }
-        }
+        return false;
       }
 
-      // General fallback matching
+      // General fallback matching if section is unclassified
       const npGeneral = code.match(/NP\s*(\d+)/i);
       if (npGeneral) {
         const pattern = new RegExp(`\\bNP\\s*0*${npGeneral[1]}\\b`, 'i');
@@ -1403,13 +1416,13 @@
           const textContent = await page.getTextContent();
           const pageText = textContent.items.map(item => item.str).join(' ');
 
-          if (/SECTION\s+IV/i.test(pageText) || /AMENDMENTS\s+TO\s+ADMIRALTY\s+SAILING\s+DIRECTIONS/i.test(pageText) || /UPDATES\s+TO\s+ADMIRALTY\s+SAILING\s+DIRECTIONS/i.test(pageText)) {
-            currentSection = "SEC_IV";
-          } else if (/SECTION\s+V/i.test(pageText) || /AMENDMENTS\s+TO\s+ADMIRALTY\s+LISTS?\s+OF\s+LIGHTS/i.test(pageText)) {
-            currentSection = "SEC_V";
-          } else if (/SECTION\s+VI/i.test(pageText) || /AMENDMENTS\s+TO\s+ADMIRALTY\s+LIST\s+OF\s+RADIO\s+SIGNALS/i.test(pageText)) {
+          if (/\bSECTION\s+VI\b/i.test(pageText) || /AMENDMENTS\s+TO\s+ADMIRALTY\s+LIST\s+OF\s+RADIO\s+SIGNALS/i.test(pageText) || /UPDATES\s+TO\s+ADMIRALTY\s+LIST\s+OF\s+RADIO\s+SIGNALS/i.test(pageText)) {
             currentSection = "SEC_VI";
-          } else if (/SECTION\s+I\b/i.test(pageText) || /SECTION\s+II\b/i.test(pageText) || /SECTION\s+III\b/i.test(pageText)) {
+          } else if (/\bSECTION\s+V\b/i.test(pageText) || /AMENDMENTS\s+TO\s+ADMIRALTY\s+LISTS?\s+OF\s+LIGHTS/i.test(pageText) || /UPDATES\s+TO\s+ADMIRALTY\s+LISTS?\s+OF\s+LIGHTS/i.test(pageText)) {
+            currentSection = "SEC_V";
+          } else if (/\bSECTION\s+IV\b/i.test(pageText) || /AMENDMENTS\s+TO\s+ADMIRALTY\s+SAILING\s+DIRECTIONS/i.test(pageText) || /UPDATES\s+TO\s+ADMIRALTY\s+SAILING\s+DIRECTIONS/i.test(pageText)) {
+            currentSection = "SEC_IV";
+          } else if (/\bSECTION\s+(?:I|II|III|VII|VIII)\b/i.test(pageText) || /INDEX\s+OF\s+CHARTS/i.test(pageText) || /RECORD\s+OF\s+NOTICES\s+TO\s+MARINERS/i.test(pageText)) {
             currentSection = "OTHER_SECTION";
           }
 
